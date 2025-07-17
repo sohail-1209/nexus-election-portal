@@ -1,7 +1,11 @@
-
 {
   "name": "N.E.X.U.S Election Board",
   "short_name": "NEXUS",
+  "description": "Administer and participate in elections securely and easily.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#00796B",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
@@ -13,10 +17,5 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ],
-  "theme_color": "#00796B",
-  "background_color": "#ffffff",
-  "start_url": "/",
-  "display": "standalone",
-  "orientation": "portrait"
+  ]
 }
