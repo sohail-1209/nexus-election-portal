@@ -14,6 +14,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: 'N.E.X.U.S Election Board',
   description: 'Administer and participate in elections securely and easily.',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'N.E.X.U.S Election Board',
+  },
 };
 
 export default function RootLayout({
@@ -28,6 +34,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <meta name="theme-color" content="#00796B" />
       </head>
       <body className={`${inter.variable} font-body antialiased min-h-screen flex flex-col`} suppressHydrationWarning={true}>
         <ThemeProvider
