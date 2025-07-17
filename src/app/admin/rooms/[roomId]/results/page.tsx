@@ -6,7 +6,7 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { getElectionRoomById } from "@/lib/electionRoomService";
-import type { ElectionRoom, Candidate } from "@/lib/types";
+import type { ElectionRoom, Candidate, Position } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart } from "lucide-react";
@@ -23,6 +23,7 @@ import autoTable, { type UserOptions } from 'jspdf-autotable';
 import ResultsPdfLayout from "@/components/app/admin/ResultsPdfLayout";
 import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
 import ReviewCharts from "@/components/app/admin/ReviewCharts";
+import StarRating from "@/components/app/StarRating";
 
 
 interface LeaderboardCandidate extends Candidate {
@@ -107,6 +108,57 @@ function OverallLeaderboard({ room }: { room: ElectionRoom }) {
     )
 }
 
+function ReviewLeaderboard({ positions }: { positions: Position[] }) {
+    const leaderboardData = useMemo(() => {
+        if (!positions) return [];
+        return [...positions].sort((a, b) => (b.averageRating || 0) - (a.averageRating || 0));
+    }, [positions]);
+
+    if (leaderboardData.length === 0) {
+        return null;
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center text-2xl font-headline">
+                    <Trophy className="mr-3 h-7 w-7 text-amber-500" />
+                    Overall Leaderboard
+                </CardTitle>
+                <CardDescription>All positions ranked by average star rating.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[80px]">Rank</TableHead>
+                            <TableHead>Position</TableHead>
+                            <TableHead>Reviewed Person</TableHead>
+                            <TableHead className="text-right">Average Rating</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {leaderboardData.map((position, index) => (
+                            <TableRow key={position.id}>
+                                <TableCell className="font-bold text-lg text-center">{index + 1}</TableCell>
+                                <TableCell className="font-medium">{position.title}</TableCell>
+                                <TableCell className="text-muted-foreground">{position.candidates[0]?.name || 'N/A'}</TableCell>
+                                <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                        <span className="font-bold text-base">
+                                            {(position.averageRating || 0).toFixed(2)}
+                                        </span>
+                                        <StarRating rating={position.averageRating || 0} onRatingChange={() => {}} disabled={true} />
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
+    );
+}
 
 export default function ElectionResultsPage() {
   const params = useParams();
@@ -311,8 +363,9 @@ export default function ElectionResultsPage() {
               <TabsTrigger value="charts" className="text-sm md:text-base"><PieChart className="mr-2 h-4 w-4"/>Charts View</TabsTrigger>
               <TabsTrigger value="feedback" className="text-sm md:text-base"><MessageSquare className="mr-2 h-4 w-4"/>Feedback View</TabsTrigger>
             </TabsList>
-            <TabsContent value="charts">
+            <TabsContent value="charts" className="space-y-8">
                 <ReviewCharts positions={room.positions} />
+                <ReviewLeaderboard positions={room.positions} />
             </TabsContent>
             <TabsContent value="feedback">
                 <ReviewResultsDisplay room={room} />
@@ -349,3 +402,5 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
