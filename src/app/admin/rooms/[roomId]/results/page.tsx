@@ -166,46 +166,45 @@ export default function ElectionResultsPage() {
     }
 
     const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
-
-    // 1. Find all ties in unresolved positions
-    const ties = unresolvedPositions
-      .map(p => {
-        const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-        if (sortedCandidates.length < 2 || (sortedCandidates[0].voteCount || 0) === 0) {
-          return null;
-        }
-        const topVoteCount = sortedCandidates[0].voteCount || 0;
-        const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-        return tiedCandidates.length > 1 ? { position: p, candidates: tiedCandidates } : null;
-      })
-      .filter((p): p is NonNullable<typeof p> => p !== null);
-
-    // 2. Find all multi-position wins from unresolved positions
-    const candidateWins = new Map<string, { name: string; positions: Position[] }>();
-
+    
+    // Step 1: Find winners for each unresolved position
+    const winnersByPosition: Record<string, Candidate[]> = {};
     unresolvedPositions.forEach(p => {
       const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
       if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) {
         return;
       }
       const topVoteCount = sortedCandidates[0].voteCount || 0;
-      const winnersInPosition = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+      winnersByPosition[p.id] = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+    });
 
-      winnersInPosition.forEach(winner => {
-        const existing = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
-        existing.positions.push(p);
-        candidateWins.set(winner.id, existing);
+    // Step 2: Detect ties
+    const ties = Object.entries(winnersByPosition)
+      .filter(([, winners]) => winners.length > 1)
+      .map(([positionId, candidates]) => ({
+        position: unresolvedPositions.find(p => p.id === positionId)!,
+        candidates,
+      }));
+
+    // Step 3: Detect multi-wins
+    const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
+    Object.entries(winnersByPosition).forEach(([positionId, winners]) => {
+      const position = unresolvedPositions.find(p => p.id === positionId)!;
+      winners.forEach(winner => {
+        const existing = winsByCandidate.get(winner.id) || { name: winner.name, positions: [] };
+        existing.positions.push(position);
+        winsByCandidate.set(winner.id, existing);
       });
     });
 
-    const multiWins = Array.from(candidateWins.entries())
-      .filter(([, data]) => data.positions.length > 1)
-      .map(([candidateId, data]) => ({
-        candidateId,
+    const multiWins = Array.from(winsByCandidate.values())
+      .filter(data => data.positions.length > 1)
+      .map(data => ({
+        candidateId: data.positions[0].candidates.find(c => c.name === data.name)!.id,
         name: data.name,
         positions: data.positions,
       }));
-      
+
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
 
     return { ties, multiWins, allConflictsResolved };

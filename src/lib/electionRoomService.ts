@@ -1,4 +1,5 @@
 
+
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
@@ -328,6 +329,10 @@ export async function declareWinner(
 
       } else {
           // Standard tie-break winner declaration
+          const candidateExists = positions[positionIndex].candidates.some((c: Candidate) => c.id === winnerCandidateId);
+          if(!candidateExists) {
+            throw new Error("Selected winner does not exist in this position.");
+          }
           positions[positionIndex].winnerCandidateId = winnerCandidateId;
       }
 
