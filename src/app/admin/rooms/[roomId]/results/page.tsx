@@ -136,45 +136,51 @@ export default function ElectionResultsPage() {
   const handleExportMarkdown = () => {
     if (!room) return;
 
-    let mdContent = `# Results for: ${room.title}\n\n`;
-    mdContent += `**Description:** ${room.description}\n`;
+    let mdContent = `# 📊 Results for: ${room.title}\n\n`;
+    mdContent += `*${room.description}*\n\n`;
     mdContent += `**Generated on:** ${new Date().toLocaleString()}\n\n`;
+    mdContent += `**Room Status:** \`${room.status}\`\n\n`;
+    mdContent += "---\n\n";
 
     if (room.roomType === 'review') {
-      mdContent += `## Review Results\n\n`;
-      room.positions.forEach(position => {
-        mdContent += `### ${position.title} - ${position.candidates[0]?.name || 'N/A'}\n`;
-        mdContent += `- **Average Rating:** ${position.averageRating?.toFixed(2) || 'N/A'} ★\n`;
-        mdContent += `- **Total Reviews:** ${position.reviews?.length || 0}\n\n`;
-        mdContent += `#### Feedback:\n\n`;
-        if (position.reviews && position.reviews.length > 0) {
-            position.reviews.forEach((review, index) => {
-                mdContent += `${index + 1}. ${review.feedback}\n`;
-            });
-        } else {
-            mdContent += `_No feedback submitted._\n`;
-        }
-        mdContent += `\n---\n\n`;
-      });
+        mdContent += `## Review Summary\n\n`;
+        room.positions.forEach(position => {
+            mdContent += `### **${position.title}** - *${position.candidates[0]?.name || 'N/A'}*\n`;
+            mdContent += `- **Average Rating:** ${position.averageRating?.toFixed(2) || 'N/A'} / 5.00 ★\n`;
+            mdContent += `- **Total Reviews:** ${position.reviews?.length || 0}\n\n`;
+            mdContent += `#### Individual Feedback:\n\n`;
+            if (position.reviews && position.reviews.length > 0) {
+                position.reviews.forEach((review) => {
+                    mdContent += `> ${review.feedback}\n\n`;
+                });
+            } else {
+                mdContent += `_No feedback submitted for this position._\n\n`;
+            }
+            mdContent += `\n---\n\n`;
+        });
     } else {
       mdContent += `## Voting Results\n\n`;
       mdContent += `*Based on **${totalCompletedVoters}** completed participant(s).*\n\n`;
 
       room.positions.forEach(position => {
         const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
+        
         mdContent += `### ${position.title}\n\n`;
-        mdContent += `| Rank | Candidate | Votes | % of Total |\n`;
-        mdContent += `|:----:|:----------|:------|:----------:|\n`;
+        mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
+        mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
         sortedCandidates.forEach((candidate, index) => {
           const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
-          mdContent += `| ${index + 1} | ${candidate.name} | ${candidate.voteCount || 0}/${totalCompletedVoters} | ${percentage}% |\n`;
+          const isWinner = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
+          const rankDisplay = isWinner ? `🏆 ${index + 1}` : `${index + 1}`;
+          mdContent += `| ${rankDisplay} | ${candidate.name} | ${candidate.voteCount || 0}/${totalCompletedVoters} | ${percentage}% |\n`;
         });
         mdContent += `\n`;
       });
     }
 
-    const blob = new Blob([mdContent], { type: 'text/markdown' });
+    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
