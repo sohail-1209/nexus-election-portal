@@ -9,7 +9,7 @@ import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService
 import type { ElectionRoom, Candidate, Position, Voter } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code } from "lucide-react";
+import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code, File, FileText } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -24,6 +24,12 @@ import ResultsPdfLayout from "@/components/app/admin/ResultsPdfLayout";
 import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
 import ReviewCharts from "@/components/app/admin/ReviewCharts";
 import StarRating from "@/components/app/StarRating";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
     const leaderboardData = useMemo(() => {
@@ -172,7 +178,7 @@ export default function ElectionResultsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    const safeTitle = room.title.replace(/[^a-z0-n]/gi, '_').toLowerCase();
+    const safeTitle = room.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     link.download = `${safeTitle}_results.md`;
     document.body.appendChild(link);
     link.click();
@@ -186,7 +192,7 @@ export default function ElectionResultsPage() {
 
     const doc = new jsPDF();
     const title = `${room.title} - Results`;
-    const safeTitle = title.replace(/[^a-z0-n]/gi, '_').toLowerCase();
+    const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
     doc.setProperties({ title: title });
 
@@ -302,14 +308,24 @@ export default function ElectionResultsPage() {
             <p className="text-muted-foreground">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button onClick={handleExportPdf} disabled={isExporting} className="w-full sm:w-auto">
-              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-              {isExporting ? 'Exporting...' : 'Export as PDF'}
-            </Button>
-             <Button onClick={handleExportMarkdown} variant="outline" className="w-full sm:w-auto">
-              <Code className="mr-2 h-4 w-4" />
-              Export .md Code
-            </Button>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button disabled={isExporting} className="w-full sm:w-auto">
+                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        {isExporting ? 'Exporting...' : 'Export'}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportPdf}>
+                        <File className="mr-2 h-4 w-4" />
+                        Export as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportMarkdown}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Export as .md Code
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </div>
 
