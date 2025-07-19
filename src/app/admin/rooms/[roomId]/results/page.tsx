@@ -160,7 +160,6 @@ export default function ElectionResultsPage() {
     return () => unsubscribe();
   }, [roomId, router, fetchRoomData]);
 
-  // --- Conflict Resolution Logic ---
   const conflicts = useMemo(() => {
     if (!room || room.status !== 'closed' || room.roomType === 'review') {
       return { ties: [], multiWins: [], allConflictsResolved: true };
@@ -172,13 +171,17 @@ export default function ElectionResultsPage() {
         const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         if (sortedCandidates.length < 2) return null;
         const topVoteCount = sortedCandidates[0].voteCount || 0;
-        if (topVoteCount === 0) return null; // No votes, no tie.
+        if (topVoteCount === 0) return null;
         const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         return tiedCandidates.length > 1 ? { position: p, candidates: tiedCandidates } : null;
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);
 
-    const candidateWins = new Map<string, { name: string, positions: Position[] }>();
+    const candidateIdToName = new Map<string, string>();
+    room.positions.forEach(p => p.candidates.forEach(c => candidateIdToName.set(c.id, c.name)));
+    
+    const candidateWins = new Map<string, Position[]>();
+
     room.positions.forEach(p => {
         if (p.winnerCandidateId) return; // Skip if already resolved
 
@@ -188,16 +191,21 @@ export default function ElectionResultsPage() {
         const topVoteCount = sortedCandidates[0].voteCount || 0;
         const topCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         
-        // This candidate is a winner or part of a tie for the top spot.
+        // Any candidate in topCandidates is a "winner" for this position, even if it's a tie
         topCandidates.forEach(winner => {
-            const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
-            wins.positions.push(p);
+            const wins = candidateWins.get(winner.id) || [];
+            wins.push(p);
             candidateWins.set(winner.id, wins);
         });
     });
 
-    const multiWins = Array.from(candidateWins.values())
-      .filter(win => win.positions.length > 1);
+    const multiWins = Array.from(candidateWins.entries())
+      .filter(([, positions]) => positions.length > 1)
+      .map(([candidateId, positions]) => ({
+          candidateId,
+          name: candidateIdToName.get(candidateId) || 'Unknown Candidate',
+          positions
+      }));
 
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
 
@@ -538,7 +546,7 @@ export default function ElectionResultsPage() {
                         <AlertTitle>Multiple Wins Detected for: {mw.name}</AlertTitle>
                         <AlertDescription>
                            This candidate won multiple positions: {mw.positions.map((p: Position) => p.title).join(', ')}. Please select one position for them to hold.
-                            <Button size="sm" variant="destructive" className="ml-4" onClick={() => openConflictDialog({type: 'multi-win', candidateId: mw.positions[0].candidates.find((c: Candidate) => c.name === mw.name)?.id, ...mw})}>
+                            <Button size="sm" variant="destructive" className="ml-4" onClick={() => openConflictDialog({type: 'multi-win', ...mw})}>
                                 Resolve Multi-win
                             </Button>
                         </AlertDescription>
@@ -658,5 +666,7 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
 
     
