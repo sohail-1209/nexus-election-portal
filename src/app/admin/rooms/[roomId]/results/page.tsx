@@ -5,8 +5,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { getElectionRoomById } from "@/lib/electionRoomService";
-import type { ElectionRoom, Candidate, Position } from "@/lib/types";
+import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService";
+import type { ElectionRoom, Candidate, Position, Voter } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart } from "lucide-react";
@@ -24,89 +24,6 @@ import ResultsPdfLayout from "@/components/app/admin/ResultsPdfLayout";
 import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
 import ReviewCharts from "@/components/app/admin/ReviewCharts";
 import StarRating from "@/components/app/StarRating";
-
-
-interface LeaderboardCandidate extends Candidate {
-  positionTitle: string;
-  totalVotesInPosition: number;
-}
-
-function OverallLeaderboard({ room }: { room: ElectionRoom }) {
-    const leaderboardData = useMemo(() => {
-        if (!room || !room.positions) return [];
-
-        const allCandidates: LeaderboardCandidate[] = [];
-        const positionTotals = new Map<string, number>();
-
-        room.positions.forEach(position => {
-            const totalVotes = position.candidates.reduce((sum, c) => sum + (c.voteCount || 0), 0);
-            positionTotals.set(position.id, totalVotes);
-        });
-
-        room.positions.forEach(position => {
-            position.candidates.forEach(candidate => {
-                allCandidates.push({ 
-                    ...candidate, 
-                    positionTitle: position.title,
-                    totalVotesInPosition: positionTotals.get(position.id) || 0,
-                });
-            });
-        });
-        return allCandidates.sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-    }, [room]);
-
-    if(leaderboardData.length === 0) {
-        return null;
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center text-2xl font-headline">
-                  <Trophy className="mr-3 h-7 w-7 text-amber-500" />
-                  Overall Leaderboard
-                </CardTitle>
-                <CardDescription>All candidates ranked by total votes across all positions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-[80px]">Rank</TableHead>
-                            <TableHead>Candidate</TableHead>
-                            <TableHead>Position</TableHead>
-                            <TableHead className="text-right">Votes</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {leaderboardData.map((candidate, index) => (
-                            <TableRow key={candidate.id}>
-                                <TableCell className="font-bold text-lg text-center">{index + 1}</TableCell>
-                                <TableCell>
-                                    <div className="flex items-center gap-3">
-                                        <Image
-                                            src={candidate.imageUrl || `https://placehold.co/60x60.png?text=${candidate.name.charAt(0)}`}
-                                            alt={candidate.name}
-                                            width={40}
-                                            height={40}
-                                            className="rounded-full object-cover"
-                                            data-ai-hint="person portrait"
-                                        />
-                                        <span className="font-medium">{candidate.name}</span>
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-muted-foreground">{candidate.positionTitle}</TableCell>
-                                <TableCell className="text-right font-bold text-lg">
-                                  {`${candidate.voteCount || 0} / ${candidate.totalVotesInPosition}`}
-                                </TableCell>
-                            </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
-    )
-}
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
     const leaderboardData = useMemo(() => {
@@ -166,6 +83,7 @@ export default function ElectionResultsPage() {
   const roomId = params.roomId as string;
   
   const [room, setRoom] = useState<ElectionRoom | null>(null);
+  const [totalCompletedVoters, setTotalCompletedVoters] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,6 +103,13 @@ export default function ElectionResultsPage() {
             return;
           }
           setRoom(roomData);
+
+          if (roomData.roomType !== 'review') {
+              const voters = await getVotersForRoom(roomId);
+              const completedVoters = voters.filter(v => v.status === 'completed');
+              setTotalCompletedVoters(completedVoters.length);
+          }
+
         } catch (err: any) {
           console.error("Failed to fetch results:", err);
            if (err.code === 'permission-denied') {
@@ -275,22 +200,6 @@ export default function ElectionResultsPage() {
             }
         };
         autoTable(doc, tableOptions);
-
-        doc.addPage();
-
-        autoTable(doc, {
-            body: [[{ content: 'Overall Leaderboard', styles: { fontSize: 18, fontStyle: 'bold' } }]],
-            theme: 'plain',
-            styles: { font: 'times' }
-        });
-
-        autoTable(doc, {
-            html: '#pdf-leaderboard-table',
-            startY: (doc as any).lastAutoTable.finalY + 2,
-            theme: 'grid',
-            headStyles: { fillColor: [0, 121, 107], font: 'times', textColor: [255, 255, 255] },
-            bodyStyles: { font: 'times' },
-        });
     }
 
     doc.save(`${safeTitle}.pdf`);
@@ -379,28 +288,27 @@ export default function ElectionResultsPage() {
           </TabsList>
           <TabsContent value="charts" className="space-y-8">
             <ResultsCharts positions={room.positions} />
-            <OverallLeaderboard room={room} />
           </TabsContent>
           <TabsContent value="table" className="space-y-8">
               <Card>
                   <CardHeader>
                       <CardTitle>Detailed Results Table</CardTitle>
-                      <CardDescription>Comprehensive breakdown of votes for each candidate and position.</CardDescription>
+                      <CardDescription>
+                        Comprehensive breakdown of votes for each candidate. 
+                        Vote counts and percentages are based on the {totalCompletedVoters} participant(s) who completed the process.
+                      </CardDescription>
                   </CardHeader>
                   <CardContent>
-                      <ResultsTable positions={room.positions} />
+                      <ResultsTable positions={room.positions} totalCompletedVoters={totalCompletedVoters} />
                   </CardContent>
               </Card>
-              <OverallLeaderboard room={room} />
           </TabsContent>
         </Tabs>
       )}
     </div>
     <div className="hidden">
-      <ResultsPdfLayout room={room} />
+      <ResultsPdfLayout room={room} totalCompletedVoters={totalCompletedVoters} />
     </div>
     </>
   );
 }
-
-    

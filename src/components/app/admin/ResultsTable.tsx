@@ -1,3 +1,4 @@
+
 import type { Position } from "@/lib/types";
 import {
   Table,
@@ -14,9 +15,10 @@ import { Trophy } from "lucide-react";
 
 interface ResultsTableProps {
   positions: Position[];
+  totalCompletedVoters: number;
 }
 
-export default function ResultsTable({ positions }: ResultsTableProps) {
+export default function ResultsTable({ positions, totalCompletedVoters }: ResultsTableProps) {
   if (!positions || positions.length === 0) {
     return <p className="text-muted-foreground text-center py-8">No positions or results to display.</p>;
   }
@@ -42,8 +44,7 @@ export default function ResultsTable({ positions }: ResultsTableProps) {
               </TableHeader>
               <TableBody>
                 {sortedCandidates.map((candidate, index) => {
-                  const totalVotesInPosition = position.candidates.reduce((sum, c) => sum + (c.voteCount || 0), 0);
-                  const percentage = totalVotesInPosition > 0 ? (((candidate.voteCount || 0) / totalVotesInPosition) * 100).toFixed(1) : "0.0";
+                  const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
                   const isWinner = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
                   return (
                     <TableRow key={candidate.id} className={isWinner ? "bg-primary/10" : ""}>
@@ -67,7 +68,9 @@ export default function ResultsTable({ positions }: ResultsTableProps) {
                         />
                       </TableCell>
                       <TableCell>{candidate.name}</TableCell>
-                      <TableCell className="text-right font-semibold">{candidate.voteCount || 0}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        {`${candidate.voteCount || 0} / ${totalCompletedVoters}`}
+                      </TableCell>
                       <TableCell className="text-right">{percentage}%</TableCell>
                     </TableRow>
                   );
@@ -79,7 +82,7 @@ export default function ResultsTable({ positions }: ResultsTableProps) {
                 )}
               </TableBody>
                {sortedCandidates.length > 0 && (
-                 <TableCaption className="py-2 text-sm">Results for {position.title}. Total votes cast: {position.candidates.reduce((sum, c) => sum + (c.voteCount || 0), 0)}</TableCaption>
+                 <TableCaption className="py-2 text-sm">Results for {position.title}. Total completed participants: {totalCompletedVoters}</TableCaption>
                )}
             </Table>
           </div>
