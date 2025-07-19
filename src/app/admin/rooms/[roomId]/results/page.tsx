@@ -217,54 +217,68 @@ export default function ElectionResultsPage() {
 
     if (room.roomType === 'review') {
         room.positions.forEach((position, index) => {
-            if (index > 0) {
-                doc.addPage();
-            }
-
-            const startY = index === 0 ? (doc as any).lastAutoTable.finalY + 5 : 15;
+            const startY = (doc as any).lastAutoTable.finalY + (index === 0 ? 15 : 20);
 
             autoTable(doc, {
                 body: [
                     [{ content: `Review for: ${position.title} - ${position.candidates[0]?.name || ''}`, styles: { fontSize: 16, fontStyle: 'bold' } }],
-                    [{ content: `Average Rating: ${position.averageRating?.toFixed(2) || 'N/A'} ★`, styles: { fontSize: 12 } }],
+                    [{ content: `Average Rating: ${position.averageRating?.toFixed(2) || 'N/A'} ★  |  Total Reviews: ${position.reviews?.length || 0}`, styles: { fontSize: 12 } }],
                 ],
                 theme: 'plain',
                 styles: { font: 'times', cellPadding: { top: 0, right: 0, bottom: 0, left: 0 } },
                 startY: startY,
             });
 
+            if (position.reviews && position.reviews.length > 0) {
+                 autoTable(doc, {
+                    head: [['S.No', 'Feedback Received']],
+                    body: (position.reviews || []).map((review, reviewIndex) => [reviewIndex + 1, review.feedback]),
+                    startY: (doc as any).lastAutoTable.finalY + 10,
+                    theme: 'grid',
+                    headStyles: { fillColor: [0, 121, 107], textColor: [255, 255, 255], font: 'times' },
+                    bodyStyles: { font: 'times' },
+                    columnStyles: {
+                        0: { cellWidth: 15, halign: 'center' },
+                    },
+                });
+            } else {
+                autoTable(doc, {
+                    body: [['No feedback submitted for this position.']],
+                    startY: (doc as any).lastAutoTable.finalY + 10,
+                    theme: 'plain',
+                });
+            }
+        });
+    } else {
+        const totalParticipants = totalCompletedVoters;
+        room.positions.forEach((position, index) => {
+            const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+            const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
+            const startY = (doc as any).lastAutoTable.finalY + (index === 0 ? 15 : 20);
+
             autoTable(doc, {
-                head: [['S.No', 'Feedback Received']],
-                body: (position.reviews || []).map((review, reviewIndex) => [reviewIndex + 1, review.feedback]),
-                startY: (doc as any).lastAutoTable.finalY + 10,
+                body: [[{ content: `Results for Position: ${position.title}`, styles: { fontSize: 16, fontStyle: 'bold' } }]],
+                theme: 'plain',
+                styles: { font: 'times', cellPadding: 0 },
+                startY: startY,
+            });
+
+            const tableBody = sortedCandidates.map((candidate, idx) => {
+                const percentage = totalParticipants > 0 ? (((candidate.voteCount || 0) / totalParticipants) * 100).toFixed(1) + "%" : "0.0%";
+                const isWinner = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
+                const rank = isWinner ? `🏆 ${idx + 1}` : `${idx + 1}`;
+                return [rank, candidate.name, `${candidate.voteCount || 0}/${totalParticipants}`, percentage];
+            });
+
+             autoTable(doc, {
+                head: [['Rank', 'Candidate Name', 'Votes Received', 'Vote Percentage']],
+                body: tableBody,
+                startY: (doc as any).lastAutoTable.finalY + 5,
                 theme: 'grid',
                 headStyles: { fillColor: [0, 121, 107], textColor: [255, 255, 255], font: 'times' },
                 bodyStyles: { font: 'times' },
-                columnStyles: {
-                    0: { cellWidth: 15, halign: 'center' },
-                },
             });
         });
-    } else {
-        const tableOptions: UserOptions = {
-            html: '#pdf-results-table',
-            startY: (doc as any).lastAutoTable.finalY + 10,
-            theme: 'grid',
-            headStyles: { fillColor: [0, 121, 107], font: 'times', textColor: [255, 255, 255] },
-            bodyStyles: { font: 'times' },
-            didParseCell: (data) => {
-                if (data.cell.raw instanceof HTMLElement) {
-                    if (data.cell.raw.querySelector('img')) {
-                        data.cell.text = '';
-                    }
-                }
-                if (data.row.raw instanceof HTMLElement && data.row.raw.classList.contains('winner-row')) {
-                    data.cell.styles.fillColor = 'transparent';
-                    data.cell.styles.textColor = 'black';
-                }
-            }
-        };
-        autoTable(doc, tableOptions);
     }
 
     doc.save(`${safeTitle}.pdf`);
