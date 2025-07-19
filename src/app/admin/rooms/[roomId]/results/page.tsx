@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -175,26 +176,24 @@ export default function ElectionResultsPage() {
         const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         return tiedCandidates.length > 1 ? { position: p, candidates: tiedCandidates } : null;
       })
-      .filter(p => p !== null);
+      .filter((p): p is NonNullable<typeof p> => p !== null);
 
-    const candidateWins = new Map<string, {name: string, positions: Position[]}>();
+    const candidateWins = new Map<string, { name: string, positions: Position[] }>();
     room.positions.forEach(p => {
-        // A position is only part of a multi-win conflict if it doesn't have an official winner yet.
-        if (!p.winnerCandidateId) {
-            const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-            if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) return;
+        if (p.winnerCandidateId) return; // Skip if already resolved
 
-            const topVoteCount = sortedCandidates[0].voteCount || 0;
-            const topCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-            
-            // Only consider it a "win" for multi-win check if there is one clear winner (no tie)
-            if (topCandidates.length === 1) {
-                const winner = topCandidates[0];
-                const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
-                wins.positions.push(p);
-                candidateWins.set(winner.id, wins);
-            }
-        }
+        const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) return;
+
+        const topVoteCount = sortedCandidates[0].voteCount || 0;
+        const topCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+        
+        // This candidate is a winner or part of a tie for the top spot.
+        topCandidates.forEach(winner => {
+            const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
+            wins.positions.push(p);
+            candidateWins.set(winner.id, wins);
+        });
     });
 
     const multiWins = Array.from(candidateWins.values())
