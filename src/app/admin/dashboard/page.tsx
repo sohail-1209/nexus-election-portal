@@ -229,11 +229,6 @@ export default function AdminDashboardPage() {
   return (
     <>
     <div className="space-y-8">
-      <div className="text-center">
-          <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Manage all your election and review rooms here.</p>
-      </div>
-
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
         <Button asChild variant="secondary">
           <Link href="/admin/rooms/create-review">
