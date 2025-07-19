@@ -28,7 +28,8 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
@@ -92,7 +93,6 @@ export default function ElectionResultsPage() {
   const [totalCompletedVoters, setTotalCompletedVoters] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [isExportingReport, setIsExportingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -134,8 +134,9 @@ export default function ElectionResultsPage() {
     return () => unsubscribe();
   }, [roomId, router]);
 
-  const handleExportMarkdown = () => {
+  const handleExportMarkdown = async () => {
     if (!room) return;
+    setIsExporting(true);
 
     let mdContent = `# 📊 Results for: ${room.title}\n\n`;
     mdContent += `*${room.description}*\n\n`;
@@ -191,6 +192,7 @@ export default function ElectionResultsPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+    setIsExporting(false);
   };
 
   const handleExportPdf = async () => {
@@ -286,9 +288,9 @@ export default function ElectionResultsPage() {
     setIsExporting(false);
   };
 
-  const handleExportFinalReport = () => {
+  const handleExportFinalReport = async () => {
     if (!room || room.roomType === 'review') return;
-    setIsExportingReport(true);
+    setIsExporting(true);
 
     let mdContent = `# Official Election Report: ${room.title}\n\n`;
     mdContent += `This report was generated on **${new Date().toLocaleString()}** after the election room was closed.\n\n`;
@@ -313,7 +315,7 @@ export default function ElectionResultsPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setIsExportingReport(false);
+    setIsExporting(false);
   };
 
 
@@ -360,31 +362,33 @@ export default function ElectionResultsPage() {
             <p className="text-muted-foreground mt-2">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-            {room.status === 'closed' && room.roomType !== 'review' ? (
-                <Button onClick={handleExportFinalReport} disabled={isExportingReport} className="w-full sm:w-auto">
-                    {isExportingReport ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                    {isExportingReport ? 'Exporting...' : 'Export Report'}
-                </Button>
-            ) : (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button disabled={isExporting} className="w-full sm:w-auto">
-                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                            {isExporting ? 'Exporting...' : 'Export'}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={handleExportPdf}>
-                            <File className="mr-2 h-4 w-4" />
-                            Export as PDF
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleExportMarkdown}>
-                            <FileText className="mr-2 h-4 w-4" />
-                            Export as .md Code
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button disabled={isExporting} className="w-full sm:w-auto">
+                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                        {isExporting ? 'Exporting...' : 'Export'}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportPdf}>
+                        <File className="mr-2 h-4 w-4" />
+                        Export as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportMarkdown}>
+                        <FileText className="mr-2 h-4 w-4" />
+                        Export as .md Code
+                    </DropdownMenuItem>
+                     {room.status === 'closed' && room.roomType !== 'review' && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={handleExportFinalReport}>
+                                <FileText className="mr-2 h-4 w-4 text-destructive" />
+                                <span className="text-destructive">Export Official Report</span>
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </div>
 
