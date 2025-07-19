@@ -165,49 +165,47 @@ export default function ElectionResultsPage() {
       return { ties: [], multiWins: [], allConflictsResolved: true };
     }
 
-    const ties = room.positions
+    const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
+
+    // 1. Find all ties in unresolved positions
+    const ties = unresolvedPositions
       .map(p => {
-        if (p.winnerCandidateId) return null; // Already resolved
         const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-        if (sortedCandidates.length < 2) return null;
+        if (sortedCandidates.length < 2 || (sortedCandidates[0].voteCount || 0) === 0) {
+          return null;
+        }
         const topVoteCount = sortedCandidates[0].voteCount || 0;
-        if (topVoteCount === 0) return null; // No votes, no tie.
         const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         return tiedCandidates.length > 1 ? { position: p, candidates: tiedCandidates } : null;
       })
       .filter((p): p is NonNullable<typeof p> => p !== null);
 
-    const candidateIdToName = new Map<string, string>();
-    room.positions.forEach(p => p.candidates.forEach(c => candidateIdToName.set(c.id, c.name)));
-    
-    const candidateWins = new Map<string, Position[]>();
+    // 2. Find all multi-position wins from unresolved positions
+    const candidateWins = new Map<string, { name: string; positions: Position[] }>();
 
-    room.positions.forEach(p => {
-        // Only consider positions that don't have a winner yet
-        if (p.winnerCandidateId) return;
+    unresolvedPositions.forEach(p => {
+      const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) {
+        return;
+      }
+      const topVoteCount = sortedCandidates[0].voteCount || 0;
+      const winnersInPosition = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
 
-        const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-        if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) return;
-
-        const topVoteCount = sortedCandidates[0].voteCount || 0;
-        const winnersInPosition = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-        
-        // Any candidate with top votes is a "winner" for this position, even if it's a tie
-        winnersInPosition.forEach(winner => {
-            const wins = candidateWins.get(winner.id) || [];
-            wins.push(p);
-            candidateWins.set(winner.id, wins);
-        });
+      winnersInPosition.forEach(winner => {
+        const existing = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
+        existing.positions.push(p);
+        candidateWins.set(winner.id, existing);
+      });
     });
 
     const multiWins = Array.from(candidateWins.entries())
-      .filter(([, positions]) => positions.length > 1)
-      .map(([candidateId, positions]) => ({
-          candidateId,
-          name: candidateIdToName.get(candidateId) || 'Unknown Candidate',
-          positions
+      .filter(([, data]) => data.positions.length > 1)
+      .map(([candidateId, data]) => ({
+        candidateId,
+        name: data.name,
+        positions: data.positions,
       }));
-
+      
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
 
     return { ties, multiWins, allConflictsResolved };
