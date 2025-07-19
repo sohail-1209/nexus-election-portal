@@ -159,6 +159,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
         candidates: position.candidates.map(candidate => ({
           ...candidate,
           voteCount: voteCounts.get(candidate.id) || 0,
+          positionTitle: position.title, // Add position title to candidate
         })),
       }));
     }

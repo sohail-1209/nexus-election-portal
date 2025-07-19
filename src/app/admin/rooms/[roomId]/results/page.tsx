@@ -19,7 +19,7 @@ import ResultsLoading from "./loading";
 import Image from "next/image";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { jsPDF } from "jspdf";
-import autoTable, { type UserOptions } from 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import ResultsPdfLayout from "@/components/app/admin/ResultsPdfLayout";
 import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
 import ReviewCharts from "@/components/app/admin/ReviewCharts";
@@ -92,6 +92,7 @@ export default function ElectionResultsPage() {
   const [totalCompletedVoters, setTotalCompletedVoters] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingReport, setIsExportingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -285,6 +286,37 @@ export default function ElectionResultsPage() {
     setIsExporting(false);
   };
 
+  const handleExportFinalReport = () => {
+    if (!room || room.roomType === 'review') return;
+    setIsExportingReport(true);
+
+    let mdContent = `# Official Election Report: ${room.title}\n\n`;
+    mdContent += `This report was generated on **${new Date().toLocaleString()}** after the election room was closed.\n\n`;
+    mdContent += `A total of **${totalCompletedVoters}** participant(s) completed the voting process.\n\n`;
+    mdContent += "---\n\n";
+    mdContent += "## Final Results\n\n";
+    mdContent += "| S.No | Candidate Name | Position | Votes Received |\n";
+    mdContent += "|:----:|:---------------|:---------|:---------------|\n";
+
+    const allCandidates = room.positions.flatMap(p => p.candidates);
+    allCandidates.forEach((candidate, index) => {
+      mdContent += `| ${index + 1} | ${candidate.name} | ${candidate.positionTitle} | ${candidate.voteCount || 0} |\n`;
+    });
+
+    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = room.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    link.download = `${safeTitle}_official_report.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setIsExportingReport(false);
+  };
+
+
   if (loading) {
     return <ResultsLoading />;
   }
@@ -328,24 +360,31 @@ export default function ElectionResultsPage() {
             <p className="text-muted-foreground mt-2">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button disabled={isExporting} className="w-full sm:w-auto">
-                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        {isExporting ? 'Exporting...' : 'Export'}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleExportPdf}>
-                        <File className="mr-2 h-4 w-4" />
-                        Export as PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportMarkdown}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Export as .md Code
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            {room.status === 'closed' && room.roomType !== 'review' ? (
+                <Button onClick={handleExportFinalReport} disabled={isExportingReport} className="w-full sm:w-auto">
+                    {isExportingReport ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                    {isExportingReport ? 'Exporting...' : 'Export Report'}
+                </Button>
+            ) : (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button disabled={isExporting} className="w-full sm:w-auto">
+                            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+                            {isExporting ? 'Exporting...' : 'Export'}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={handleExportPdf}>
+                            <File className="mr-2 h-4 w-4" />
+                            Export as PDF
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={handleExportMarkdown}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Export as .md Code
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            )}
         </div>
       </div>
 

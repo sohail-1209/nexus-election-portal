@@ -4,6 +4,7 @@ export interface Candidate {
   name: string;
   imageUrl?: string;
   voteCount?: number; // Optional: for results
+  positionTitle?: string; // Optional: for consolidated reports
 }
 
 export interface Review {
