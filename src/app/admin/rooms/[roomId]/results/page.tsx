@@ -305,7 +305,7 @@ export default function ElectionResultsPage() {
             </Link>
             </Button>
             <h1 className="text-3xl font-bold font-headline mt-2">Results: {room.title}</h1>
-            <p className="text-muted-foreground">{room.description}</p>
+            <p className="text-muted-foreground mt-2">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
             <DropdownMenu>
