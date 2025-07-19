@@ -268,80 +268,96 @@ export async function declareWinner(
     roomId: string, 
     positionId: string, 
     winnerCandidateId: string,
+    adminPassword: string,
     options: { forfeitedBy?: string } = {}
 ): Promise<{ success: boolean, message: string }> {
   const roomRef = doc(db, "electionRooms", roomId);
+  const user = auth.currentUser;
+
+  if (!user || !user.email) {
+      throw new Error("No authenticated user found. Please log in again.");
+  }
+  
   try {
-    await runTransaction(db, async (transaction) => {
-      const roomDoc = await transaction.get(roomRef);
-      if (!roomDoc.exists()) {
-        throw new Error("Room not found.");
-      }
+      const credential = EmailAuthProvider.credential(user.email, adminPassword);
+      await reauthenticateWithCredential(user, credential);
       
-      const roomData = roomDoc.data();
-      let positions = roomData.positions.map((p: Position) => ({...p}));
+      await runTransaction(db, async (transaction) => {
+        const roomDoc = await transaction.get(roomRef);
+        if (!roomDoc.exists()) {
+          throw new Error("Room not found.");
+        }
+        
+        const roomData = roomDoc.data();
+        let positions = roomData.positions.map((p: Position) => ({...p}));
 
-      const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
-      if (positionIndex === -1) {
-        throw new Error("Position not found.");
-      }
+        const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
+        if (positionIndex === -1) {
+          throw new Error("Position not found.");
+        }
 
-      if (winnerCandidateId === 'forfeited') {
-          const votesSnap = await getDocs(collection(db, "electionRooms", roomId, "votes"));
-          const voteCounts = new Map<string, number>();
-          votesSnap.forEach(voteDoc => {
-              const voteData = voteDoc.data();
-              if (voteData.positionId === positionId) {
-                const candId = voteData.candidateId;
-                voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
-              }
-          });
+        if (winnerCandidateId === 'forfeited') {
+            const votesSnap = await getDocs(collection(db, "electionRooms", roomId, "votes"));
+            const voteCounts = new Map<string, number>();
+            votesSnap.forEach(voteDoc => {
+                const voteData = voteDoc.data();
+                if (voteData.positionId === positionId) {
+                  const candId = voteData.candidateId;
+                  voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
+                }
+            });
 
-          const candidatesWithVotes = positions[positionIndex].candidates
-              .map((c: Candidate) => ({
-                  ...c,
-                  voteCount: voteCounts.get(c.id) || 0,
-              }))
-              .filter((c: Candidate) => c.id !== options.forfeitedBy); 
+            const candidatesWithVotes = positions[positionIndex].candidates
+                .map((c: Candidate) => ({
+                    ...c,
+                    voteCount: voteCounts.get(c.id) || 0,
+                }))
+                .filter((c: Candidate) => c.id !== options.forfeitedBy);
 
-          if (candidatesWithVotes.length > 0) {
-            candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
-            
-            const topVoteCount = candidatesWithVotes[0].voteCount || 0;
-            if (topVoteCount > 0) {
-              const runnersUp = candidatesWithVotes.filter(c => c.voteCount === topVoteCount);
+            if (candidatesWithVotes.length > 0) {
+              candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
               
-              if (runnersUp.length === 1) {
-                // Clear winner among remaining candidates
-                positions[positionIndex].winnerCandidateId = runnersUp[0].id;
+              const topVoteCount = candidatesWithVotes[0].voteCount || 0;
+              if (topVoteCount > 0) {
+                const runnersUp = candidatesWithVotes.filter((c: Candidate) => (c.voteCount || 0) === topVoteCount);
+                
+                if (runnersUp.length === 1) {
+                  // Clear winner among remaining candidates
+                  positions[positionIndex].winnerCandidateId = runnersUp[0].id;
+                } else {
+                  // No clear winner, there's a tie for the runner-up spot. Mark as unresolved.
+                  positions[positionIndex].winnerCandidateId = null;
+                }
               } else {
-                // No clear winner, there's a tie for the runner-up spot. Mark as unresolved.
+                // No votes for any remaining candidates
                 positions[positionIndex].winnerCandidateId = null;
               }
             } else {
-              // No votes for any remaining candidates
-              positions[positionIndex].winnerCandidateId = null;
+               // No other candidates, position becomes vacant
+               positions[positionIndex].winnerCandidateId = null;
             }
-          } else {
-             // No other candidates, position becomes vacant
-             positions[positionIndex].winnerCandidateId = null;
-          }
 
-      } else {
-          // Standard tie-break winner declaration
-          const candidateExists = positions[positionIndex].candidates.some((c: Candidate) => c.id === winnerCandidateId);
-          if(!candidateExists) {
-            throw new Error("Selected winner does not exist in this position.");
-          }
-          positions[positionIndex].winnerCandidateId = winnerCandidateId;
-      }
+        } else {
+            // Standard tie-break winner declaration
+            const candidateExists = positions[positionIndex].candidates.some((c: Candidate) => c.id === winnerCandidateId);
+            if(!candidateExists) {
+              throw new Error("Selected winner does not exist in this position.");
+            }
+            positions[positionIndex].winnerCandidateId = winnerCandidateId;
+        }
 
-      transaction.update(roomRef, { positions });
-    });
-    return { success: true, message: "Winner declared successfully." };
+        transaction.update(roomRef, { positions });
+      });
+      return { success: true, message: "Winner declared successfully." };
   } catch (error: any) {
     console.error("Error declaring winner:", error);
-    return { success: false, message: error.message || "Failed to declare winner." };
+     if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error("Incorrect password provided. Resolution failed.");
+    }
+    if (error.code === 'auth/requires-recent-login') {
+        throw new Error("This action requires a recent login. Please log out and log back in.");
+    }
+    throw new Error(error.message || "Failed to declare winner.");
   }
 }
 
