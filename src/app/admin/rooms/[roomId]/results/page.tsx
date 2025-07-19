@@ -9,7 +9,7 @@ import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService
 import type { ElectionRoom, Candidate, Position, Voter } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart } from "lucide-react";
+import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -126,6 +126,59 @@ export default function ElectionResultsPage() {
     });
     return () => unsubscribe();
   }, [roomId, router]);
+
+  const handleExportMarkdown = () => {
+    if (!room) return;
+
+    let mdContent = `# Results for: ${room.title}\n\n`;
+    mdContent += `**Description:** ${room.description}\n`;
+    mdContent += `**Generated on:** ${new Date().toLocaleString()}\n\n`;
+
+    if (room.roomType === 'review') {
+      mdContent += `## Review Results\n\n`;
+      room.positions.forEach(position => {
+        mdContent += `### ${position.title} - ${position.candidates[0]?.name || 'N/A'}\n`;
+        mdContent += `- **Average Rating:** ${position.averageRating?.toFixed(2) || 'N/A'} ★\n`;
+        mdContent += `- **Total Reviews:** ${position.reviews?.length || 0}\n\n`;
+        mdContent += `#### Feedback:\n\n`;
+        if (position.reviews && position.reviews.length > 0) {
+            position.reviews.forEach((review, index) => {
+                mdContent += `${index + 1}. ${review.feedback}\n`;
+            });
+        } else {
+            mdContent += `_No feedback submitted._\n`;
+        }
+        mdContent += `\n---\n\n`;
+      });
+    } else {
+      mdContent += `## Voting Results\n\n`;
+      mdContent += `*Based on **${totalCompletedVoters}** completed participant(s).*\n\n`;
+
+      room.positions.forEach(position => {
+        const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        mdContent += `### ${position.title}\n\n`;
+        mdContent += `| Rank | Candidate | Votes | % of Total |\n`;
+        mdContent += `|:----:|:----------|:------|:----------:|\n`;
+        
+        sortedCandidates.forEach((candidate, index) => {
+          const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
+          mdContent += `| ${index + 1} | ${candidate.name} | ${candidate.voteCount || 0}/${totalCompletedVoters} | ${percentage}% |\n`;
+        });
+        mdContent += `\n`;
+      });
+    }
+
+    const blob = new Blob([mdContent], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeTitle = room.title.replace(/[^a-z0-n]/gi, '_').toLowerCase();
+    link.download = `${safeTitle}_results.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const handleExportPdf = async () => {
     if (!room) return;
@@ -248,10 +301,16 @@ export default function ElectionResultsPage() {
             <h1 className="text-3xl font-bold font-headline mt-2">Results: {room.title}</h1>
             <p className="text-muted-foreground">{room.description}</p>
         </div>
-        <Button onClick={handleExportPdf} disabled={isExporting} className="w-full sm:w-auto">
-          {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-          {isExporting ? 'Exporting...' : 'Export as PDF'}
-        </Button>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button onClick={handleExportPdf} disabled={isExporting} className="w-full sm:w-auto">
+              {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+              {isExporting ? 'Exporting...' : 'Export as PDF'}
+            </Button>
+             <Button onClick={handleExportMarkdown} variant="outline" className="w-full sm:w-auto">
+              <Code className="mr-2 h-4 w-4" />
+              Export .md Code
+            </Button>
+        </div>
       </div>
 
       {room.status !== 'closed' && (
