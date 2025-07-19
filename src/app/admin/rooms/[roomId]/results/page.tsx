@@ -182,16 +182,17 @@ export default function ElectionResultsPage() {
         // A position is only part of a multi-win conflict if it doesn't have an official winner yet.
         if (!p.winnerCandidateId) {
             const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-            if (sortedCandidates.length > 0 && (sortedCandidates[0].voteCount || 0) > 0) {
-                // Check for ties in this position first. If there's a tie, it's not a "win" yet.
-                const topVoteCount = sortedCandidates[0].voteCount || 0;
-                const tiedWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-                if (tiedWinners.length === 1) {
-                    const winner = sortedCandidates[0];
-                    const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
-                    wins.positions.push(p);
-                    candidateWins.set(winner.id, wins);
-                }
+            if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) return;
+
+            const topVoteCount = sortedCandidates[0].voteCount || 0;
+            const topCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+            
+            // Only consider it a "win" for multi-win check if there is one clear winner (no tie)
+            if (topCandidates.length === 1) {
+                const winner = topCandidates[0];
+                const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
+                wins.positions.push(p);
+                candidateWins.set(winner.id, wins);
             }
         }
     });
@@ -658,3 +659,5 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
