@@ -1,15 +1,16 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter, notFound } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService";
+import { getElectionRoomById, getVotersForRoom, declareWinner } from "@/lib/electionRoomService";
 import type { ElectionRoom, Candidate, Position, Voter } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code, File, FileText } from "lucide-react";
+import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code, File, FileText, BadgeHelp, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -31,6 +32,20 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
     const leaderboardData = useMemo(() => {
@@ -88,12 +103,45 @@ export default function ElectionResultsPage() {
   const params = useParams();
   const router = useRouter();
   const roomId = params.roomId as string;
+  const { toast } = useToast();
   
   const [room, setRoom] = useState<ElectionRoom | null>(null);
   const [totalCompletedVoters, setTotalCompletedVoters] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [isConflictDialogOpen, setIsConflictDialogOpen] = useState(false);
+  const [currentConflict, setCurrentConflict] = useState<any>(null);
+  const [selectedResolution, setSelectedResolution] = useState<string | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  
+  const fetchRoomData = useCallback(async () => {
+    if (!roomId) return;
+    try {
+      const roomData = await getElectionRoomById(roomId, { withVoteCounts: true });
+      if (!roomData) {
+        notFound();
+        return;
+      }
+      setRoom(roomData);
+
+      if (roomData.roomType !== 'review') {
+        const voters = await getVotersForRoom(roomId);
+        const completedVoters = voters.filter(v => v.status === 'completed');
+        setTotalCompletedVoters(completedVoters.length);
+      }
+    } catch (err: any) {
+      console.error("Failed to fetch results:", err);
+      if (err.code === 'permission-denied') {
+        setError("You do not have permission to view this page. Please ensure you are logged in as an admin.");
+      } else {
+        setError("An unexpected error occurred while loading the results. Please try again later.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [roomId]);
 
   useEffect(() => {
     if (!roomId) {
@@ -103,36 +151,98 @@ export default function ElectionResultsPage() {
     };
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        try {
-          const roomData = await getElectionRoomById(roomId, { withVoteCounts: true });
-          if (!roomData) {
-            notFound();
-            return;
-          }
-          setRoom(roomData);
-
-          if (roomData.roomType !== 'review') {
-              const voters = await getVotersForRoom(roomId);
-              const completedVoters = voters.filter(v => v.status === 'completed');
-              setTotalCompletedVoters(completedVoters.length);
-          }
-
-        } catch (err: any) {
-          console.error("Failed to fetch results:", err);
-           if (err.code === 'permission-denied') {
-             setError("You do not have permission to view this page. Please ensure you are logged in as an admin.");
-          } else {
-            setError("An unexpected error occurred while loading the results. Please try again later.");
-          }
-        } finally {
-          setLoading(false);
-        }
+        fetchRoomData();
       } else {
         router.push('/admin/login');
       }
     });
     return () => unsubscribe();
-  }, [roomId, router]);
+  }, [roomId, router, fetchRoomData]);
+
+  // --- Conflict Resolution Logic ---
+  const conflicts = useMemo(() => {
+    if (!room || room.status !== 'closed' || room.roomType === 'review') {
+      return { ties: [], multiWins: [], allConflictsResolved: true };
+    }
+
+    const ties = room.positions
+      .map(p => {
+        const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        if (sortedCandidates.length < 2) return null;
+        const topVoteCount = sortedCandidates[0].voteCount || 0;
+        if (topVoteCount === 0) return null; // No votes, no tie.
+        const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+        return tiedCandidates.length > 1 && !p.winnerCandidateId ? { position: p, candidates: tiedCandidates } : null;
+      })
+      .filter(p => p !== null);
+
+    const candidateWins = new Map<string, {name: string, positions: Position[]}>();
+    room.positions.forEach(p => {
+      const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      if (sortedCandidates.length > 0 && (sortedCandidates[0].voteCount || 0) > 0) {
+        const winner = sortedCandidates[0];
+        const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
+        wins.positions.push(p);
+        candidateWins.set(winner.id, wins);
+      }
+    });
+
+    const multiWins = Array.from(candidateWins.values())
+      .filter(win => win.positions.length > 1)
+      .filter(win => {
+        // This multi-win is a conflict only if the candidate hasn't been deselected from all but one position
+        const officialWins = room.positions.filter(p => p.winnerCandidateId === win.positions[0].candidates.find(c => c.name === win.name)?.id);
+        return officialWins.length !== 1;
+      });
+
+    const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
+
+    return { ties, multiWins, allConflictsResolved };
+  }, [room]);
+
+
+  const openConflictDialog = (conflict: any) => {
+    setCurrentConflict(conflict);
+    setSelectedResolution(null);
+    setIsConflictDialogOpen(true);
+  };
+
+  const handleResolveConflict = async () => {
+    if (!currentConflict || !selectedResolution || !room) return;
+    setIsResolving(true);
+    
+    let resolutionPromises = [];
+
+    if (currentConflict.type === 'tie') {
+      resolutionPromises.push(declareWinner(room.id, currentConflict.position.id, selectedResolution));
+    } else if (currentConflict.type === 'multi-win') {
+      const candidateId = currentConflict.candidateId;
+      const winningPositionId = selectedResolution;
+      
+      // Declare winner for the selected position
+      resolutionPromises.push(declareWinner(room.id, winningPositionId, candidateId));
+      
+      // Forfeit other positions by setting winner to null
+      currentConflict.positions.forEach((p: Position) => {
+        if (p.id !== winningPositionId) {
+          resolutionPromises.push(declareWinner(room.id, p.id, 'forfeited')); // Use a special marker
+        }
+      });
+    }
+
+    try {
+      await Promise.all(resolutionPromises);
+      toast({ title: "Conflict Resolved", description: "The winner has been officially recorded." });
+      await fetchRoomData(); // Re-fetch data to update UI
+    } catch (error) {
+      toast({ variant: 'destructive', title: "Resolution Failed", description: "Could not save the resolution. Please try again." });
+    } finally {
+      setIsResolving(false);
+      setIsConflictDialogOpen(false);
+      setCurrentConflict(null);
+    }
+  };
+
 
   const handleExportMarkdown = async () => {
     if (!room) return;
@@ -289,20 +399,28 @@ export default function ElectionResultsPage() {
   };
 
   const handleExportFinalReport = async () => {
-    if (!room || room.roomType === 'review') return;
+    if (!room || room.roomType === 'review' || !conflicts.allConflictsResolved) return;
     setIsExporting(true);
 
     let mdContent = `# Official Election Report: ${room.title}\n\n`;
-    mdContent += `This report was generated on **${new Date().toLocaleString()}** after the election room was closed.\n\n`;
+    mdContent += `This report was generated on **${new Date().toLocaleString()}** after the election room was closed and all conflicts were resolved.\n\n`;
     mdContent += `A total of **${totalCompletedVoters}** participant(s) completed the voting process.\n\n`;
     mdContent += "---\n\n";
-    mdContent += "## Final Results\n\n";
-    mdContent += "| S.No | Candidate Name | Position | Votes Received |\n";
-    mdContent += "|:----:|:---------------|:---------|:---------------|\n";
+    mdContent += "## Final Declared Winners\n\n";
+    mdContent += "| S.No | Position | Winner | Votes Received |\n";
+    mdContent += "|:----:|:---------|:-------|:---------------|\n";
 
-    const allCandidates = room.positions.flatMap(p => p.candidates);
-    allCandidates.forEach((candidate, index) => {
-      mdContent += `| ${index + 1} | ${candidate.name} | ${candidate.positionTitle} | ${candidate.voteCount || 0} |\n`;
+    const officialWinners = room.positions
+        .map(p => {
+            const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
+            return winner ? { ...winner, positionTitle: p.title } : null;
+        })
+        .filter(w => w !== null);
+
+    officialWinners.forEach((winner, index) => {
+        if(winner) {
+            mdContent += `| ${index + 1} | ${winner.positionTitle} | ${winner.name} | ${winner.voteCount || 0} |\n`;
+        }
     });
 
     const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
@@ -381,7 +499,7 @@ export default function ElectionResultsPage() {
                      {room.status === 'closed' && room.roomType !== 'review' && (
                         <>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleExportFinalReport}>
+                            <DropdownMenuItem onClick={handleExportFinalReport} disabled={!conflicts.allConflictsResolved}>
                                 <FileText className="mr-2 h-4 w-4 text-destructive" />
                                 <span className="text-destructive">Export Official Report</span>
                             </DropdownMenuItem>
@@ -391,6 +509,52 @@ export default function ElectionResultsPage() {
             </DropdownMenu>
         </div>
       </div>
+
+       {room.status === 'closed' && room.roomType === 'voting' && !conflicts.allConflictsResolved && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2"><BadgeHelp className="h-6 w-6 text-amber-600" />Conflict Resolution Required</CardTitle>
+                <CardDescription>
+                   The election has finished, but there are unresolved ties or multi-position wins. Please resolve these conflicts below to enable the final report export.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {conflicts.ties.map((tie: any, index: number) => (
+                    <Alert key={`tie-${index}`} variant="destructive" className="border-destructive/30">
+                        <AlertTitle>Tie Detected in: {tie.position.title}</AlertTitle>
+                        <AlertDescription>
+                            The following candidates received the same number of votes: {tie.candidates.map((c: Candidate) => c.name).join(', ')}.
+                             <Button size="sm" variant="destructive" className="ml-4" onClick={() => openConflictDialog({type: 'tie', ...tie})}>
+                                Resolve Tie
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                ))}
+                {conflicts.multiWins.map((mw: any, index: number) => (
+                     <Alert key={`mw-${index}`} variant="destructive" className="border-destructive/30">
+                        <AlertTitle>Multiple Wins Detected for: {mw.name}</AlertTitle>
+                        <AlertDescription>
+                           This candidate won multiple positions: {mw.positions.map((p: Position) => p.title).join(', ')}. Please select one position for them to hold.
+                            <Button size="sm" variant="destructive" className="ml-4" onClick={() => openConflictDialog({type: 'multi-win', candidateId: mw.positions[0].candidates.find((c: Candidate) => c.name === mw.name)?.id, ...mw})}>
+                                Resolve Multi-win
+                            </Button>
+                        </AlertDescription>
+                    </Alert>
+                ))}
+            </CardContent>
+        </Card>
+      )}
+
+       {room.status === 'closed' && room.roomType === 'voting' && conflicts.allConflictsResolved && (
+         <Alert variant="default" className="border-green-600/50 bg-green-500/5">
+           <CheckCircle className="h-4 w-4 text-green-600" />
+           <AlertTitle>All Conflicts Resolved</AlertTitle>
+           <AlertDescription>
+             All ties and multiple-position wins have been resolved. The official report is now available for export.
+           </AlertDescription>
+         </Alert>
+       )}
+
 
       {room.status !== 'closed' && (
         <Card className="border-primary bg-primary/5">
@@ -444,6 +608,47 @@ export default function ElectionResultsPage() {
         </Tabs>
       )}
     </div>
+
+    {/* Conflict Resolution Dialog */}
+    <AlertDialog open={isConflictDialogOpen} onOpenChange={setIsConflictDialogOpen}>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+            <AlertDialogTitle>
+                Resolve Election Conflict: {currentConflict?.type === 'tie' ? `Tie in ${currentConflict.position.title}` : `Multiple Wins for ${currentConflict?.name}`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+                {currentConflict?.type === 'tie' 
+                ? 'Two or more candidates have the same number of votes. Please manually select one candidate as the official winner for this position.'
+                : 'This candidate has won in multiple positions. Please choose which position they will officially hold. The other positions will be marked as forfeited.'}
+            </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4">
+                <RadioGroup value={selectedResolution || ''} onValueChange={setSelectedResolution}>
+                    {currentConflict?.type === 'tie' && currentConflict.candidates.map((c: Candidate) => (
+                        <div key={c.id} className="flex items-center space-x-2">
+                           <RadioGroupItem value={c.id} id={`res-${c.id}`} />
+                           <Label htmlFor={`res-${c.id}`} className="flex-grow">{c.name} ({c.voteCount} votes)</Label>
+                        </div>
+                    ))}
+                    {currentConflict?.type === 'multi-win' && currentConflict.positions.map((p: Position) => (
+                         <div key={p.id} className="flex items-center space-x-2">
+                           <RadioGroupItem value={p.id} id={`res-${p.id}`} />
+                           <Label htmlFor={`res-${p.id}`}>{p.title}</Label>
+                        </div>
+                    ))}
+                </RadioGroup>
+            </div>
+            <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResolveConflict} disabled={!selectedResolution || isResolving}>
+                {isResolving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Declare Winner
+            </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+    </AlertDialog>
+
+
     <div className="hidden">
       <ResultsPdfLayout room={room} totalCompletedVoters={totalCompletedVoters} />
     </div>

@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/table";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-import { Trophy } from "lucide-react";
+import { Trophy, Award } from "lucide-react";
 
 interface ResultsTableProps {
   positions: Position[];
@@ -46,10 +46,15 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
                 {sortedCandidates.map((candidate, index) => {
                   const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
                   const isWinner = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
+                  
                   return (
-                    <TableRow key={candidate.id} className={isWinner ? "bg-primary/10" : ""}>
+                    <TableRow key={candidate.id} className={candidate.isOfficialWinner ? "bg-green-600/10" : (isWinner ? "bg-primary/10" : "")}>
                       <TableCell className="font-medium text-center">
-                        {isWinner ? (
+                        {candidate.isOfficialWinner ? (
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
+                                <Award className="h-3 w-3 mr-1" /> Official Winner
+                            </Badge>
+                        ) : isWinner ? (
                             <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white">
                                 <Trophy className="h-3 w-3 mr-1" /> {index + 1}
                             </Badge>

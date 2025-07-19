@@ -5,6 +5,7 @@ export interface Candidate {
   imageUrl?: string;
   voteCount?: number; // Optional: for results
   positionTitle?: string; // Optional: for consolidated reports
+  isOfficialWinner?: boolean; // Set after conflict resolution
 }
 
 export interface Review {
@@ -18,6 +19,7 @@ export interface Position {
   id: string;
   title: string;
   candidates: Candidate[];
+  winnerCandidateId?: string | null; // ID of the officially declared winner
   // For review results
   averageRating?: number;
   reviews?: Review[];

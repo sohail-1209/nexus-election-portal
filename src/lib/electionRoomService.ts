@@ -48,6 +48,7 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
           return {
             id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
             title: p?.title || "Untitled Position",
+            winnerCandidateId: p?.winnerCandidateId || null,
             candidates: Array.isArray(candidatesRaw)
               ? candidatesRaw.map((c: any) => ({
                   id: c?.id || `cand-${Math.random().toString(36).substr(2, 9)}`,
@@ -90,6 +91,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
   let finalPositions: Position[] = (data.positions || []).map((p: any) => ({
     id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
     title: p?.title || "Untitled Position",
+    winnerCandidateId: p?.winnerCandidateId || null,
     candidates: (p?.candidates || []).map((c: any) => ({
       id: c?.id || `cand-${Math.random().toString(36).substr(2, 9)}`,
       name: c?.name || "Unnamed Candidate",
@@ -153,6 +155,13 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
         const candidateId = voteData.candidateId;
         voteCounts.set(candidateId, (voteCounts.get(candidateId) || 0) + 1);
       });
+
+      const officialWinnersByPosition = new Map<string, string>();
+      finalPositions.forEach(p => {
+        if(p.winnerCandidateId) {
+          officialWinnersByPosition.set(p.id, p.winnerCandidateId);
+        }
+      });
       
       finalPositions = finalPositions.map(position => ({
         ...position,
@@ -160,6 +169,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
           ...candidate,
           voteCount: voteCounts.get(candidate.id) || 0,
           positionTitle: position.title, // Add position title to candidate
+          isOfficialWinner: officialWinnersByPosition.get(position.id) === candidate.id,
         })),
       }));
     }
@@ -251,6 +261,32 @@ export async function deleteElectionRoom(roomId: string, adminPassword: string):
         }
         return { success: false, message: "An unexpected error occurred while deleting the room." };
     }
+}
+
+export async function declareWinner(roomId: string, positionId: string, winnerCandidateId: string): Promise<{ success: boolean, message: string }> {
+  const roomRef = doc(db, "electionRooms", roomId);
+  try {
+    await runTransaction(db, async (transaction) => {
+      const roomDoc = await transaction.get(roomRef);
+      if (!roomDoc.exists()) {
+        throw new Error("Room not found.");
+      }
+      
+      const roomData = roomDoc.data();
+      const positions = roomData.positions.map((p: Position) => {
+        if (p.id === positionId) {
+          return { ...p, winnerCandidateId: winnerCandidateId };
+        }
+        return p;
+      });
+
+      transaction.update(roomRef, { positions });
+    });
+    return { success: true, message: "Winner declared successfully." };
+  } catch (error: any) {
+    console.error("Error declaring winner:", error);
+    return { success: false, message: error.message || "Failed to declare winner." };
+  }
 }
 
 export async function recordParticipantEntry(
