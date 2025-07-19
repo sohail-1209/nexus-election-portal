@@ -167,33 +167,37 @@ export default function ElectionResultsPage() {
 
     const ties = room.positions
       .map(p => {
+        if (p.winnerCandidateId) return null; // Already resolved
         const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         if (sortedCandidates.length < 2) return null;
         const topVoteCount = sortedCandidates[0].voteCount || 0;
         if (topVoteCount === 0) return null; // No votes, no tie.
         const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-        return tiedCandidates.length > 1 && !p.winnerCandidateId ? { position: p, candidates: tiedCandidates } : null;
+        return tiedCandidates.length > 1 ? { position: p, candidates: tiedCandidates } : null;
       })
       .filter(p => p !== null);
 
     const candidateWins = new Map<string, {name: string, positions: Position[]}>();
     room.positions.forEach(p => {
-      const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-      if (sortedCandidates.length > 0 && (sortedCandidates[0].voteCount || 0) > 0) {
-        const winner = sortedCandidates[0];
-        const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
-        wins.positions.push(p);
-        candidateWins.set(winner.id, wins);
-      }
+        // A position is only part of a multi-win conflict if it doesn't have an official winner yet.
+        if (!p.winnerCandidateId) {
+            const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+            if (sortedCandidates.length > 0 && (sortedCandidates[0].voteCount || 0) > 0) {
+                // Check for ties in this position first. If there's a tie, it's not a "win" yet.
+                const topVoteCount = sortedCandidates[0].voteCount || 0;
+                const tiedWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+                if (tiedWinners.length === 1) {
+                    const winner = sortedCandidates[0];
+                    const wins = candidateWins.get(winner.id) || { name: winner.name, positions: [] };
+                    wins.positions.push(p);
+                    candidateWins.set(winner.id, wins);
+                }
+            }
+        }
     });
 
     const multiWins = Array.from(candidateWins.values())
-      .filter(win => win.positions.length > 1)
-      .filter(win => {
-        // This multi-win is a conflict only if the candidate hasn't been deselected from all but one position
-        const officialWins = room.positions.filter(p => p.winnerCandidateId === win.positions[0].candidates.find(c => c.name === win.name)?.id);
-        return officialWins.length !== 1;
-      });
+      .filter(win => win.positions.length > 1);
 
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
 
@@ -214,28 +218,29 @@ export default function ElectionResultsPage() {
     let resolutionPromises = [];
 
     if (currentConflict.type === 'tie') {
-      resolutionPromises.push(declareWinner(room.id, currentConflict.position.id, selectedResolution));
+      resolutionPromises.push(declareWinner(room.id, currentConflict.position.id, selectedResolution, {}));
     } else if (currentConflict.type === 'multi-win') {
       const candidateId = currentConflict.candidateId;
       const winningPositionId = selectedResolution;
       
       // Declare winner for the selected position
-      resolutionPromises.push(declareWinner(room.id, winningPositionId, candidateId));
+      resolutionPromises.push(declareWinner(room.id, winningPositionId, candidateId, {}));
       
-      // Forfeit other positions by setting winner to null
+      // Forfeit other positions. The backend service will handle runner-up logic.
       currentConflict.positions.forEach((p: Position) => {
         if (p.id !== winningPositionId) {
-          resolutionPromises.push(declareWinner(room.id, p.id, 'forfeited')); // Use a special marker
+          resolutionPromises.push(declareWinner(room.id, p.id, 'forfeited', {forfeitedBy: candidateId}));
         }
       });
     }
 
     try {
       await Promise.all(resolutionPromises);
-      toast({ title: "Conflict Resolved", description: "The winner has been officially recorded." });
+      toast({ title: "Conflict Resolved", description: "The winner has been officially recorded. Refreshing results..." });
       await fetchRoomData(); // Re-fetch data to update UI
-    } catch (error) {
-      toast({ variant: 'destructive', title: "Resolution Failed", description: "Could not save the resolution. Please try again." });
+    } catch (error: any) {
+      console.error("Error resolving conflict:", error);
+      toast({ variant: 'destructive', title: "Resolution Failed", description: error.message || "Could not save the resolution. Please try again." });
     } finally {
       setIsResolving(false);
       setIsConflictDialogOpen(false);
@@ -276,7 +281,6 @@ export default function ElectionResultsPage() {
 
       room.positions.forEach(position => {
         const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-        const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
         
         mdContent += `### ${position.title}\n\n`;
         mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
@@ -284,7 +288,7 @@ export default function ElectionResultsPage() {
         
         sortedCandidates.forEach((candidate, index) => {
           const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
-          const isWinner = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
+          const isWinner = candidate.isOfficialWinner || (conflicts.allConflictsResolved && index === 0 && (candidate.voteCount || 0) > 0);
           const rankDisplay = isWinner ? `🏆 ${index + 1}` : `${index + 1}`;
           mdContent += `| ${rankDisplay} | ${candidate.name} | ${candidate.voteCount || 0}/${totalCompletedVoters} | ${percentage}% |\n`;
         });
@@ -366,7 +370,6 @@ export default function ElectionResultsPage() {
         const totalParticipants = totalCompletedVoters;
         room.positions.forEach((position, index) => {
             const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-            const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
             const startY = (doc as any).lastAutoTable.finalY + (index === 0 ? 15 : 20);
 
             autoTable(doc, {
@@ -378,7 +381,7 @@ export default function ElectionResultsPage() {
 
             const tableBody = sortedCandidates.map((candidate, idx) => {
                 const percentage = totalParticipants > 0 ? (((candidate.voteCount || 0) / totalParticipants) * 100).toFixed(1) + "%" : "0.0%";
-                const isWinner = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
+                const isWinner = candidate.isOfficialWinner;
                 const rank = isWinner ? `🏆 ${idx + 1}` : `${idx + 1}`;
                 return [rank, candidate.name, `${candidate.voteCount || 0}/${totalParticipants}`, percentage];
             });
@@ -619,7 +622,7 @@ export default function ElectionResultsPage() {
             <AlertDialogDescription>
                 {currentConflict?.type === 'tie' 
                 ? 'Two or more candidates have the same number of votes. Please manually select one candidate as the official winner for this position.'
-                : 'This candidate has won in multiple positions. Please choose which position they will officially hold. The other positions will be marked as forfeited.'}
+                : `Candidate ${currentConflict?.name} has won in multiple positions. Please consult with the candidate and choose the position they will retain. The other position(s) will be assigned to the runner-up, if available.`}
             </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4">

@@ -2,7 +2,7 @@
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, Candidate } from '@/lib/types';
 
 export async function getElectionRooms(): Promise<ElectionRoom[]> {
   const electionRoomsCol = collection(db, "electionRooms");
@@ -263,7 +263,12 @@ export async function deleteElectionRoom(roomId: string, adminPassword: string):
     }
 }
 
-export async function declareWinner(roomId: string, positionId: string, winnerCandidateId: string): Promise<{ success: boolean, message: string }> {
+export async function declareWinner(
+    roomId: string, 
+    positionId: string, 
+    winnerCandidateId: string,
+    options: { forfeitedBy?: string }
+): Promise<{ success: boolean, message: string }> {
   const roomRef = doc(db, "electionRooms", roomId);
   try {
     await runTransaction(db, async (transaction) => {
@@ -273,12 +278,52 @@ export async function declareWinner(roomId: string, positionId: string, winnerCa
       }
       
       const roomData = roomDoc.data();
-      const positions = roomData.positions.map((p: Position) => {
-        if (p.id === positionId) {
-          return { ...p, winnerCandidateId: winnerCandidateId };
-        }
-        return p;
-      });
+      let positions = roomData.positions.map((p: Position) => ({...p})); // Deep copy
+
+      const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
+      if (positionIndex === -1) {
+        throw new Error("Position not found.");
+      }
+
+      // Handle Forfeiture and Runner-Up Logic
+      if (winnerCandidateId === 'forfeited') {
+          const votesSnap = await getDocs(collection(db, "electionRooms", roomId, "votes"));
+          const voteCounts = new Map<string, number>();
+          votesSnap.forEach(voteDoc => {
+              const voteData = voteDoc.data();
+              if (voteData.positionId === positionId) {
+                const candId = voteData.candidateId;
+                voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
+              }
+          });
+
+          const candidatesWithVotes = positions[positionIndex].candidates.map((c: Candidate) => ({
+              ...c,
+              voteCount: voteCounts.get(c.id) || 0,
+          })).filter((c: Candidate) => c.id !== options.forfeitedBy); // Exclude the person who forfeited
+
+          if (candidatesWithVotes.length > 0) {
+            candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
+            
+            const topVoteCount = candidatesWithVotes[0].voteCount || 0;
+            const runnersUp = candidatesWithVotes.filter(c => c.voteCount === topVoteCount);
+            
+            if (runnersUp.length === 1 && topVoteCount > 0) {
+              // Clear winner among remaining candidates
+              positions[positionIndex].winnerCandidateId = runnersUp[0].id;
+            } else {
+              // No winner, or a tie for the runner-up spot. Mark as unresolved.
+              positions[positionIndex].winnerCandidateId = null;
+            }
+          } else {
+             // No other candidates, position becomes vacant
+             positions[positionIndex].winnerCandidateId = null;
+          }
+
+      } else {
+          // Standard tie-break winner declaration
+          positions[positionIndex].winnerCandidateId = winnerCandidateId;
+      }
 
       transaction.update(roomRef, { positions });
     });
