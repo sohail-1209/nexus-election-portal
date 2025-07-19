@@ -19,7 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { ElectionRoom } from "@/lib/types"; 
+import type { ElectionRoom, Branch } from "@/lib/types"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlusCircle, Trash2, Loader2, GripVertical } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -43,6 +43,7 @@ const positionSchema = z.object({
 const reviewRoomFormSchema = z.object({
   title: z.string().min(3, { message: "Title must be at least 3 characters." }),
   description: z.string().min(10, { message: "Description must be at least 10 characters." }),
+  branchId: z.string().min(1, { message: "Please select a branch for this room." }),
   positions: z.array(positionSchema).min(1, "At least one position is required."),
   status: z.enum(["pending", "active", "closed"]).optional(),
 }).refine(data => {
@@ -58,12 +59,13 @@ const reviewRoomFormSchema = z.object({
 type ReviewRoomFormValues = z.infer<typeof reviewRoomFormSchema>;
 
 interface ReviewRoomFormProps {
-  initialData?: ElectionRoom; 
+  initialData?: ElectionRoom;
+  branches: Branch[];
 }
 
 const generateClientSideId = (prefix: string = "item") => `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 
-export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
+export default function ReviewRoomForm({ initialData, branches }: ReviewRoomFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -74,6 +76,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
     defaultValues: initialData ? {
       title: initialData.title || "",
       description: initialData.description || "",
+      branchId: initialData.branchId || "",
       status: initialData.status || "pending",
       positions: (initialData.positions || []).map(p => ({
         id: p.id,
@@ -87,6 +90,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
     } : {
       title: "",
       description: "",
+      branchId: "",
       status: "pending",
       positions: [],
     },
@@ -126,6 +130,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
     const dataToSave: any = { 
       title: values.title,
       description: values.description,
+      branchId: values.branchId,
       isAccessRestricted: false,
       accessCode: null,
       positions: firestoreReadyPositions,
@@ -182,6 +187,33 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="branchId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Branch</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a branch to house this room" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {branches.map((branch) => (
+                    <SelectItem key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                This room will be organized under the selected branch on the dashboard.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="title"

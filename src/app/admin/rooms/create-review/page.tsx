@@ -1,11 +1,33 @@
 
+"use client";
+
 import ReviewRoomForm from '@/components/app/admin/ReviewRoomForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { getBranches } from '@/lib/branchService';
+import { Branch } from '@/lib/types';
+import { useEffect, useState } from 'react';
 
 export default function CreateReviewRoomPage() {
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchBranches() {
+      try {
+        const branchesData = await getBranches();
+        setBranches(branchesData);
+      } catch (error) {
+        console.error("Failed to fetch branches", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchBranches();
+  }, []);
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <Button variant="outline" asChild className="mb-4">
@@ -19,7 +41,21 @@ export default function CreateReviewRoomPage() {
           <CardDescription>A room for taking feedback/rating of the previous member of Club</CardDescription>
         </CardHeader>
         <CardContent>
-          <ReviewRoomForm />
+          {loading ? (
+             <div className="flex items-center justify-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="ml-2">Loading Branches...</p>
+            </div>
+          ) : branches.length === 0 ? (
+            <div className="text-center space-y-4">
+                <p className="text-muted-foreground">You must create a branch before you can create a review room.</p>
+                <Button asChild>
+                    <Link href="/admin/dashboard">Go to Dashboard to Create a Branch</Link>
+                </Button>
+            </div>
+          ) : (
+             <ReviewRoomForm branches={branches} />
+          )}
         </CardContent>
       </Card>
     </div>

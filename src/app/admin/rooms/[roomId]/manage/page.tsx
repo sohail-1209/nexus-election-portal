@@ -6,11 +6,12 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseClient";
 import { getElectionRoomById } from "@/lib/electionRoomService";
-import type { ElectionRoom, Voter } from "@/lib/types";
+import { getBranches } from "@/lib/branchService";
+import type { ElectionRoom, Voter, Branch } from "@/lib/types";
 
 import ElectionRoomForm from '@/components/app/admin/ElectionRoomForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BarChart3, AlertTriangle, Fingerprint, Users, Activity, CheckCircle, LogIn } from 'lucide-react';
+import { ArrowLeft, BarChart3, AlertTriangle, Fingerprint, Users, Activity, CheckCircle, LogIn, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import ReviewRoomForm from "@/components/app/admin/ReviewRoomForm";
 
 
 function LiveStatusSkeleton() {
@@ -160,6 +162,8 @@ export default function ManageElectionRoomPage() {
   const roomId = params.roomId as string;
 
   const [room, setRoom] = useState<ElectionRoom | null>(null);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
 
@@ -171,24 +175,32 @@ export default function ManageElectionRoomPage() {
 
     if (!roomId) {
         setError("Room ID is missing from the URL.");
+        setLoading(false);
         return;
     };
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const roomData = await getElectionRoomById(roomId);
+          const [roomData, branchesData] = await Promise.all([
+            getElectionRoomById(roomId),
+            getBranches()
+          ]);
+          
           if (!roomData) {
             notFound();
             return;
           }
           setRoom(roomData);
+          setBranches(branchesData);
         } catch (err: any) {
-          console.error("Failed to fetch voting room:", err);
+          console.error("Failed to fetch data:", err);
           if (err.code === 'permission-denied') {
              setError("You do not have permission to view this page. Please ensure you are logged in as an admin.");
           } else {
             setError("An unexpected error occurred while loading the page. Please try again later.");
           }
+        } finally {
+          setLoading(false);
         }
       } else {
         router.push('/admin/login');
@@ -197,6 +209,23 @@ export default function ManageElectionRoomPage() {
     return () => unsubscribe();
   }, [roomId, router]);
 
+  if (loading) {
+     return (
+      <div className="max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-48" /> {/* Back button */}
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-3/4 mb-2" /> {/* Title */}
+            <Skeleton className="h-4 w-1/2" /> {/* Description */}
+          </CardHeader>
+          <CardContent className="flex items-center justify-center h-64">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   if (error) {
     return (
       <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
@@ -217,12 +246,25 @@ export default function ManageElectionRoomPage() {
   }
 
   if (!room) {
-    // This will be handled by the not-found.tsx file if room is null after fetching
-    // And Next.js will show loading.tsx while fetching.
-    return null; 
+    return notFound(); 
   }
 
   const voterLink = `${baseUrl}/vote/${room.id}`;
+
+  const renderForm = () => {
+    if (branches.length === 0) {
+      return (
+         <div className="text-center text-muted-foreground p-8">
+            <p>Cannot edit this room because no branches exist.</p>
+            <p className="text-sm">Please create a branch from the dashboard first.</p>
+        </div>
+      )
+    }
+    if (room.roomType === 'review') {
+      return <ReviewRoomForm initialData={room} branches={branches} />;
+    }
+    return <ElectionRoomForm initialData={room} branches={branches} />;
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -242,10 +284,10 @@ export default function ManageElectionRoomPage() {
       <Card className="shadow-xl">
         <CardHeader>
           <CardTitle className="text-3xl font-headline">Manage: {room.title}</CardTitle>
-          <CardDescription>Edit details, positions, candidates, and manage access for this voting room.</CardDescription>
+          <CardDescription>Edit details, positions, candidates, and manage access for this {room.roomType} room.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ElectionRoomForm initialData={room} />
+          {renderForm()}
         </CardContent>
       </Card>
 
