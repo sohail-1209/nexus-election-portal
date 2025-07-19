@@ -166,45 +166,53 @@ export default function ElectionResultsPage() {
     }
 
     const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
+    if (unresolvedPositions.length === 0) {
+        return { ties: [], multiWins: [], allConflictsResolved: true };
+    }
     
     // Step 1: Find winners for each unresolved position
-    const winnersByPosition: Record<string, Candidate[]> = {};
-    unresolvedPositions.forEach(p => {
-      const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-      if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) {
-        return;
+    const winnersByPosition: { position: Position; winners: Candidate[] }[] = [];
+    for (const position of unresolvedPositions) {
+      if (position.candidates.length === 0) continue;
+
+      const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      const topVoteCount = sortedCandidates[0]?.voteCount || 0;
+
+      if (topVoteCount > 0) {
+        const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+        winnersByPosition.push({ position, winners: currentWinners });
       }
-      const topVoteCount = sortedCandidates[0].voteCount || 0;
-      winnersByPosition[p.id] = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-    });
+    }
 
     // Step 2: Detect ties
-    const ties = Object.entries(winnersByPosition)
-      .filter(([, winners]) => winners.length > 1)
-      .map(([positionId, candidates]) => ({
-        position: unresolvedPositions.find(p => p.id === positionId)!,
-        candidates,
+    const ties = winnersByPosition
+      .filter(({ winners }) => winners.length > 1)
+      .map(({ position, winners }) => ({
+        position,
+        candidates: winners,
       }));
 
     // Step 3: Detect multi-wins
     const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
-    Object.entries(winnersByPosition).forEach(([positionId, winners]) => {
-      const position = unresolvedPositions.find(p => p.id === positionId)!;
-      winners.forEach(winner => {
-        const existing = winsByCandidate.get(winner.id) || { name: winner.name, positions: [] };
-        existing.positions.push(position);
-        winsByCandidate.set(winner.id, existing);
-      });
-    });
+    const allCandidatesFlat = room.positions.flatMap(p => p.candidates);
+    const candidateIdToNameMap = new Map(allCandidatesFlat.map(c => [c.id, c.name]));
 
-    const multiWins = Array.from(winsByCandidate.values())
-      .filter(data => data.positions.length > 1)
-      .map(data => ({
-        candidateId: data.positions[0].candidates.find(c => c.name === data.name)!.id,
+    for (const { position, winners } of winnersByPosition) {
+        for (const winner of winners) {
+            const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
+            existing.positions.push(position);
+            winsByCandidate.set(winner.id, existing);
+        }
+    }
+
+    const multiWins = Array.from(winsByCandidate.entries())
+      .filter(([, data]) => data.positions.length > 1)
+      .map(([candidateId, data]) => ({
+        candidateId,
         name: data.name,
         positions: data.positions,
       }));
-
+      
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
 
     return { ties, multiWins, allConflictsResolved };
@@ -673,3 +681,5 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
