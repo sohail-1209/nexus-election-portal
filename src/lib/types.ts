@@ -23,13 +23,6 @@ export interface Position {
   ratingDistribution?: { name: string, count: number }[];
 }
 
-export interface Branch {
-  id: string;
-  name: string;
-  description: string;
-  createdAt: string;
-}
-
 export interface ElectionRoom {
   id:string;
   title: string;
@@ -41,7 +34,6 @@ export interface ElectionRoom {
   updatedAt?: string; // Added for Firestore timestamp
   status: 'pending' | 'active' | 'closed';
   roomType?: 'voting' | 'review';
-  branchId?: string;
 }
 
 export interface Voter {

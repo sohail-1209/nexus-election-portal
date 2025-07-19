@@ -6,8 +6,7 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseClient";
 import { getElectionRoomById } from "@/lib/electionRoomService";
-import { getBranches } from "@/lib/branchService";
-import type { ElectionRoom, Voter, Branch } from "@/lib/types";
+import type { ElectionRoom, Voter } from "@/lib/types";
 
 import ElectionRoomForm from '@/components/app/admin/ElectionRoomForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +14,6 @@ import { ArrowLeft, BarChart3, AlertTriangle, Fingerprint, Users, Activity, Chec
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import Image from 'next/image';
 import ShareableLinkDisplay from "@/components/app/admin/ShareableLinkDisplay";
 import { collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -162,7 +160,6 @@ export default function ManageElectionRoomPage() {
   const roomId = params.roomId as string;
 
   const [room, setRoom] = useState<ElectionRoom | null>(null);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
@@ -181,17 +178,13 @@ export default function ManageElectionRoomPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const [roomData, branchesData] = await Promise.all([
-            getElectionRoomById(roomId),
-            getBranches()
-          ]);
+          const roomData = await getElectionRoomById(roomId);
           
           if (!roomData) {
             notFound();
             return;
           }
           setRoom(roomData);
-          setBranches(branchesData);
         } catch (err: any) {
           console.error("Failed to fetch data:", err);
           if (err.code === 'permission-denied') {
@@ -252,18 +245,10 @@ export default function ManageElectionRoomPage() {
   const voterLink = `${baseUrl}/vote/${room.id}`;
 
   const renderForm = () => {
-    if (branches.length === 0) {
-      return (
-         <div className="text-center text-muted-foreground p-8">
-            <p>Cannot edit this room because no branches exist.</p>
-            <p className="text-sm">Please create a branch from the dashboard first.</p>
-        </div>
-      )
-    }
     if (room.roomType === 'review') {
-      return <ReviewRoomForm initialData={room} branches={branches} />;
+      return <ReviewRoomForm initialData={room} />;
     }
-    return <ElectionRoomForm initialData={room} branches={branches} />;
+    return <ElectionRoomForm initialData={room} />;
   }
 
   return (

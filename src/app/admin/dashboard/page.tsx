@@ -1,13 +1,12 @@
 
 "use client";
 
-import { useEffect, useState, type FormEvent, useMemo } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { getElectionRooms, deleteElectionRoom } from "@/lib/electionRoomService";
-import { getBranches, createBranch } from "@/lib/branchService";
-import type { ElectionRoom, Branch } from "@/lib/types";
+import type { ElectionRoom } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
@@ -24,16 +23,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
-import { PlusCircle, Settings, BarChart3, Users, CalendarDays, LockKeyhole, CheckCircle, Clock, XCircle, AlertTriangle, PenSquare, Vote, Star, Trash2, Loader2, Eye, EyeOff, FolderPlus, Folder, FolderArchive } from "lucide-react";
+import { PlusCircle, Settings, BarChart3, Users, CalendarDays, LockKeyhole, CheckCircle, Clock, XCircle, AlertTriangle, PenSquare, Vote, Star, Trash2, Loader2, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { format } from 'date-fns';
-import { cn } from "@/lib/utils";
-import { Textarea } from "@/components/ui/textarea";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 function StatusBadge({ status }: { status: ElectionRoom['status'] }) {
   switch (status) {
@@ -63,84 +57,29 @@ function RoomTypeBadge({ type }: { type: ElectionRoom['roomType'] }) {
   );
 }
 
-function CreateBranchDialog({ onBranchCreated }: { onBranchCreated: (newBranch: Branch) => void }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
-  const { toast } = useToast();
-
-  const handleCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    setIsCreating(true);
-    const result = await createBranch(name, description);
-    if (result.success && result.branchId) {
-      toast({ title: "Branch Created", description: `"${name}" has been successfully created.` });
-      onBranchCreated({ id: result.branchId, name, description, createdAt: new Date().toISOString() });
-      setName("");
-      setDescription("");
-      setIsOpen(false);
-    } else {
-      toast({ variant: "destructive", title: "Creation Failed", description: result.message });
-    }
-    setIsCreating(false);
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="secondary">
-          <FolderPlus className="mr-2 h-5 w-5" /> Create New Branch
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create a New Branch</DialogTitle>
-          <DialogDescription>
-            Branches act like folders to help you organize your election and review rooms.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleCreate} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="branch-name">Branch Name</Label>
-            <Input id="branch-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Spring 2025 Elections" autoFocus />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="branch-description">Description (Optional)</Label>
-            <Textarea id="branch-description" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="A brief description of this branch." />
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" disabled={isCreating || !name}>
-              {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Branch
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function DashboardSkeleton() {
   return (
     <div className="space-y-8">
-       <Card className="text-center">
-            <CardHeader>
-                <Skeleton className="h-8 w-1/2 mx-auto" />
-                <Skeleton className="h-4 w-3/4 mx-auto" />
-            </CardHeader>
-        </Card>
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-10 w-56" />
-        <Skeleton className="h-10 w-56" />
       </div>
-      <div className="space-y-4">
-        {[1, 2].map(i => (
-          <Skeleton key={i} className="h-14 w-full" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3].map(i => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-5 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-4 w-full mb-2" />
+              <Skeleton className="h-4 w-2/3" />
+            </CardContent>
+            <CardFooter className="grid grid-cols-2 gap-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </CardFooter>
+          </Card>
         ))}
       </div>
     </div>
@@ -197,7 +136,6 @@ function RoomCard({ room, openDeleteDialog }: { room: ElectionRoom, openDeleteDi
 
 export default function AdminDashboardPage() {
   const [electionRooms, setElectionRooms] = useState<ElectionRoom[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -213,12 +151,8 @@ export default function AdminDashboardPage() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
-          const [roomsData, branchesData] = await Promise.all([
-            getElectionRooms(),
-            getBranches()
-          ]);
+          const roomsData = await getElectionRooms();
           setElectionRooms(roomsData);
-          setBranches(branchesData);
         } catch (err: any) {
           console.error("Failed to fetch data:", err);
           if (err.code === 'permission-denied') {
@@ -269,28 +203,6 @@ export default function AdminDashboardPage() {
     setIsDeleting(false);
   };
 
-  const groupedRooms = useMemo(() => {
-    const grouped: Record<string, ElectionRoom[]> = {};
-    const uncategorized: ElectionRoom[] = [];
-    
-    electionRooms.forEach(room => {
-      if (room.branchId && branches.some(b => b.id === room.branchId)) {
-        if (!grouped[room.branchId]) {
-          grouped[room.branchId] = [];
-        }
-        grouped[room.branchId].push(room);
-      } else {
-        uncategorized.push(room);
-      }
-    });
-
-    return { grouped, uncategorized };
-  }, [electionRooms, branches]);
-
-  const handleBranchCreated = (newBranch: Branch) => {
-    setBranches(prev => [newBranch, ...prev]);
-  };
-
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -317,20 +229,12 @@ export default function AdminDashboardPage() {
   return (
     <>
     <div className="space-y-8">
-      <Card className="text-center">
-          <CardHeader>
-              <CardTitle className="text-3xl font-headline flex items-center justify-center">
-                  <span className="mr-3 text-2xl" role="img" aria-label="ballot box">🗳️</span>
-                  Election Control Panel
-              </CardTitle>
-              <CardDescription className="max-w-2xl mx-auto">
-                  Access and manage all the rooms created for the NEXUS 2025 Elections, including voting rooms and review session(s). Stay organized and monitor all election activity in one place.
-              </CardDescription>
-          </CardHeader>
-      </Card>
+      <div className="text-center">
+          <h1 className="text-3xl font-bold font-headline">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-2">Manage all your election and review rooms here.</p>
+      </div>
 
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-        <CreateBranchDialog onBranchCreated={handleBranchCreated} />
         <Button asChild variant="secondary">
           <Link href="/admin/rooms/create-review">
             <PenSquare className="mr-2 h-5 w-5" /> Create New Review Room
@@ -343,64 +247,17 @@ export default function AdminDashboardPage() {
         </Button>
       </div>
 
-      <Accordion type="multiple" className="w-full space-y-4" defaultValue={branches.map(b => b.id).concat('uncategorized')}>
-        {branches.map(branch => (
-          <AccordionItem value={branch.id} key={branch.id} className="border-none">
-            <Card className="shadow-md">
-              <AccordionTrigger className="hover:no-underline px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <Folder className="h-6 w-6 text-primary" />
-                  <div>
-                    <h3 className="text-lg font-semibold">{branch.name}</h3>
-                    <p className="text-sm text-muted-foreground text-left">{branch.description}</p>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6 pt-0">
-                {groupedRooms.grouped[branch.id]?.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                    {groupedRooms.grouped[branch.id].map(room => (
-                      <RoomCard key={room.id} room={room} openDeleteDialog={openDeleteDialog} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground border-dashed border-2 rounded-lg mt-4">
-                    <p>No rooms in this branch yet.</p>
-                  </div>
-                )}
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-        ))}
-
-        {groupedRooms.uncategorized.length > 0 && (
-          <AccordionItem value="uncategorized" className="border-none">
-             <Card className="shadow-md">
-              <AccordionTrigger className="hover:no-underline px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <FolderArchive className="h-6 w-6 text-muted-foreground" />
-                  <div>
-                    <h3 className="text-lg font-semibold">Uncategorized</h3>
-                  </div>
-                </div>
-              </AccordionTrigger>
-              <AccordionContent className="px-6 pb-6 pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
-                  {groupedRooms.uncategorized.map(room => (
-                    <RoomCard key={room.id} room={room} openDeleteDialog={openDeleteDialog} />
-                  ))}
-                </div>
-              </AccordionContent>
-            </Card>
-          </AccordionItem>
-        )}
-      </Accordion>
-
-      {electionRooms.length === 0 && (
-        <Card className="text-center py-12">
+      {electionRooms.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {electionRooms.map(room => (
+              <RoomCard key={room.id} room={room} openDeleteDialog={openDeleteDialog} />
+            ))}
+          </div>
+      ) : (
+        <Card className="text-center py-16">
           <CardHeader>
-            <CardTitle className="text-2xl">No Rooms or Branches Yet</CardTitle>
-            <CardDescription>Get started by creating a branch, then add rooms to it.</CardDescription>
+            <CardTitle className="text-2xl">No Rooms Yet</CardTitle>
+            <CardDescription>Get started by creating a new voting or review room.</CardDescription>
           </CardHeader>
         </Card>
       )}

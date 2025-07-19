@@ -71,7 +71,6 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
       updatedAt: updatedAt,
       status: (data.status as ElectionRoom['status']) || 'pending',
       roomType: data.roomType || 'voting',
-      branchId: data.branchId || undefined,
     };
   });
 }
@@ -191,7 +190,6 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     updatedAt: updatedAt,
     status: (data.status as ElectionRoom['status']) || 'pending',
     roomType: data.roomType || 'voting',
-    branchId: data.branchId || undefined,
   };
 }
 
