@@ -3,43 +3,33 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-  
-    // Admins (any authenticated user) have full access to all data.
-    // This allows them to create, read, update, and delete election rooms.
-    match /{document=**} {
+    // Admin-only collections: only authenticated users can read/write
+    match /branches/{branchId} {
       allow read, write: if request.auth != null;
     }
     
-    // Public Access Rules for Participants
+    // Election Rooms: Admins can manage, anyone can read for voting
     match /electionRooms/{roomId} {
-    
-      // Allow anyone to read the main document of a specific election room.
-      // This is necessary for participants to see the positions and candidates.
-      allow get: if true;
-      
-      // Deny public users from listing all rooms or writing to the main room document.
-      allow list, create, update, delete: if request.auth != null;
-      
-      // Allow anyone to create and update their own voter status document.
-      // This is crucial for tracking "In Room" and "Completed" statuses.
-      // They can only affect their own document, identified by their email in the path.
+      allow read: if true;
+      allow write: if request.auth != null;
+
+      // Voters subcollection: Anyone can create their own voter doc, admins can manage
       match /voters/{voterId} {
-        allow read, create, update: if true;
-        allow delete: if request.auth != null;
+        allow read, update, delete: if request.auth != null;
+        allow create: if true;
       }
       
-      // Allow anyone to create new documents in the 'votes' subcollection.
-      // This is how ballots are submitted anonymously.
+      // Votes and Reviews subcollections: Anyone can create, admins can read
       match /votes/{voteId} {
+        allow read: if true;
         allow create: if true;
-        allow read, update, delete: if request.auth != null;
+        allow write, delete: if request.auth != null;
       }
-      
-      // Allow anyone to create new documents in the 'reviews' subcollection.
-      // This is how reviews are submitted anonymously.
+
       match /reviews/{reviewId} {
+        allow read: if true;
         allow create: if true;
-        allow read, update, delete: if request.auth != null;
+        allow write, delete: if request.auth != null;
       }
     }
   }
