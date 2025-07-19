@@ -267,7 +267,7 @@ export async function declareWinner(
     roomId: string, 
     positionId: string, 
     winnerCandidateId: string,
-    options: { forfeitedBy?: string }
+    options: { forfeitedBy?: string } = {}
 ): Promise<{ success: boolean, message: string }> {
   const roomRef = doc(db, "electionRooms", roomId);
   try {
@@ -278,14 +278,13 @@ export async function declareWinner(
       }
       
       const roomData = roomDoc.data();
-      let positions = roomData.positions.map((p: Position) => ({...p})); // Deep copy
+      let positions = roomData.positions.map((p: Position) => ({...p}));
 
       const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
       if (positionIndex === -1) {
         throw new Error("Position not found.");
       }
 
-      // Handle Forfeiture and Runner-Up Logic
       if (winnerCandidateId === 'forfeited') {
           const votesSnap = await getDocs(collection(db, "electionRooms", roomId, "votes"));
           const voteCounts = new Map<string, number>();
@@ -297,22 +296,29 @@ export async function declareWinner(
               }
           });
 
-          const candidatesWithVotes = positions[positionIndex].candidates.map((c: Candidate) => ({
-              ...c,
-              voteCount: voteCounts.get(c.id) || 0,
-          })).filter((c: Candidate) => c.id !== options.forfeitedBy); // Exclude the person who forfeited
+          const candidatesWithVotes = positions[positionIndex].candidates
+              .map((c: Candidate) => ({
+                  ...c,
+                  voteCount: voteCounts.get(c.id) || 0,
+              }))
+              .filter((c: Candidate) => c.id !== options.forfeitedBy); 
 
           if (candidatesWithVotes.length > 0) {
             candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
             
             const topVoteCount = candidatesWithVotes[0].voteCount || 0;
-            const runnersUp = candidatesWithVotes.filter(c => c.voteCount === topVoteCount);
-            
-            if (runnersUp.length === 1 && topVoteCount > 0) {
-              // Clear winner among remaining candidates
-              positions[positionIndex].winnerCandidateId = runnersUp[0].id;
+            if (topVoteCount > 0) {
+              const runnersUp = candidatesWithVotes.filter(c => c.voteCount === topVoteCount);
+              
+              if (runnersUp.length === 1) {
+                // Clear winner among remaining candidates
+                positions[positionIndex].winnerCandidateId = runnersUp[0].id;
+              } else {
+                // No clear winner, there's a tie for the runner-up spot. Mark as unresolved.
+                positions[positionIndex].winnerCandidateId = null;
+              }
             } else {
-              // No winner, or a tie for the runner-up spot. Mark as unresolved.
+              // No votes for any remaining candidates
               positions[positionIndex].winnerCandidateId = null;
             }
           } else {

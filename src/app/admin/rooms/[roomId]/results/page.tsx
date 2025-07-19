@@ -171,7 +171,7 @@ export default function ElectionResultsPage() {
         const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         if (sortedCandidates.length < 2) return null;
         const topVoteCount = sortedCandidates[0].voteCount || 0;
-        if (topVoteCount === 0) return null;
+        if (topVoteCount === 0) return null; // No votes, no tie.
         const tiedCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         return tiedCandidates.length > 1 ? { position: p, candidates: tiedCandidates } : null;
       })
@@ -183,16 +183,17 @@ export default function ElectionResultsPage() {
     const candidateWins = new Map<string, Position[]>();
 
     room.positions.forEach(p => {
-        if (p.winnerCandidateId) return; // Skip if already resolved
+        // Only consider positions that don't have a winner yet
+        if (p.winnerCandidateId) return;
 
         const sortedCandidates = [...p.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         if (sortedCandidates.length === 0 || (sortedCandidates[0].voteCount || 0) === 0) return;
 
         const topVoteCount = sortedCandidates[0].voteCount || 0;
-        const topCandidates = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+        const winnersInPosition = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         
-        // Any candidate in topCandidates is a "winner" for this position, even if it's a tie
-        topCandidates.forEach(winner => {
+        // Any candidate with top votes is a "winner" for this position, even if it's a tie
+        winnersInPosition.forEach(winner => {
             const wins = candidateWins.get(winner.id) || [];
             wins.push(p);
             candidateWins.set(winner.id, wins);
@@ -477,6 +478,17 @@ export default function ElectionResultsPage() {
     return notFound();
   }
 
+  const getConflictDialogDescription = () => {
+    if (!currentConflict) return "";
+    if (currentConflict.type === 'tie') {
+      return 'Two or more candidates have the same number of votes. Please manually select one candidate as the official winner for this position.';
+    }
+    if (currentConflict.type === 'multi-win') {
+      return `Candidate ${currentConflict.name} has won in multiple positions: ${currentConflict.positions.map((p: Position) => p.title).join(' and ')}. Please choose the preferred position to assign them as the final winner.`;
+    }
+    return "";
+  };
+
   return (
     <>
     <div className="space-y-8">
@@ -628,9 +640,7 @@ export default function ElectionResultsPage() {
                 Resolve Election Conflict: {currentConflict?.type === 'tie' ? `Tie in ${currentConflict.position.title}` : `Multiple Wins for ${currentConflict?.name}`}
             </AlertDialogTitle>
             <AlertDialogDescription>
-                {currentConflict?.type === 'tie' 
-                ? 'Two or more candidates have the same number of votes. Please manually select one candidate as the official winner for this position.'
-                : `Candidate ${currentConflict?.name} has won in multiple positions. Please consult with the candidate and choose the position they will retain. The other position(s) will be assigned to the runner-up, if available.`}
+                {getConflictDialogDescription()}
             </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4">
@@ -666,7 +676,3 @@ export default function ElectionResultsPage() {
     </>
   );
 }
-
-    
-
-    
