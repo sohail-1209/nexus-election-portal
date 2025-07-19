@@ -62,6 +62,12 @@ function RoomTypeBadge({ type }: { type: ElectionRoom['roomType'] }) {
 function DashboardSkeleton() {
   return (
     <div className="space-y-8">
+       <Card className="text-center">
+            <CardHeader>
+                <Skeleton className="h-8 w-1/2 mx-auto" />
+                <Skeleton className="h-4 w-3/4 mx-auto" />
+            </CardHeader>
+        </Card>
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
         <Skeleton className="h-10 w-56" />
         <Skeleton className="h-10 w-56" />
@@ -188,6 +194,18 @@ export default function AdminDashboardPage() {
   return (
     <>
     <div className="space-y-8">
+      <Card className="text-center">
+          <CardHeader>
+              <CardTitle className="text-3xl font-headline flex items-center justify-center">
+                  <span className="mr-3 text-2xl" role="img" aria-label="ballot box">🗳️</span>
+                  Election Control Panel
+              </CardTitle>
+              <CardDescription className="max-w-2xl mx-auto">
+                  Access and manage all the rooms created for the NEXUS 2025 Elections, including voting rooms and review session(s). Stay organized and monitor all election activity in one place.
+              </CardDescription>
+          </CardHeader>
+      </Card>
+
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
         <Button asChild variant="secondary">
           <Link href="/admin/rooms/create-review">
