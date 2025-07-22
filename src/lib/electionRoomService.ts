@@ -289,7 +289,7 @@ export async function declareWinner(
         }
         
         const roomData = roomDoc.data();
-        let positions = roomData.positions.map((p: Position) => ({...p}));
+        let positions: Position[] = roomData.positions.map((p: any) => ({...p}));
 
         const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
         if (positionIndex === -1) {
@@ -307,6 +307,14 @@ export async function declareWinner(
                 }
             });
 
+            // Get a set of all candidates who have already won another position
+            const existingWinners = new Set<string>();
+            positions.forEach(p => {
+              if (p.winnerCandidateId) {
+                existingWinners.add(p.winnerCandidateId);
+              }
+            });
+
             const candidatesWithVotes = positions[positionIndex].candidates
                 .map((c: Candidate) => ({
                     ...c,
@@ -314,25 +322,29 @@ export async function declareWinner(
                 }))
                 .filter((c: Candidate) => c.name !== options.forfeitedByCandidateName);
 
-            if (candidatesWithVotes.length > 0) {
-              candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
+             // Filter out candidates who have already won another position
+            const eligibleCandidates = candidatesWithVotes.filter(c => !existingWinners.has(c.id));
+
+            if (eligibleCandidates.length > 0) {
+              eligibleCandidates.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
               
-              const topVoteCount = candidatesWithVotes[0]?.voteCount || 0;
+              const topVoteCount = eligibleCandidates[0]?.voteCount || 0;
 
               if (topVoteCount > 0) {
-                const runnersUp = candidatesWithVotes.filter((c: Candidate) => (c.voteCount || 0) === topVoteCount);
+                const runnersUp = eligibleCandidates.filter((c: Candidate) => (c.voteCount || 0) === topVoteCount);
                 if (runnersUp.length === 1) {
+                  // A clear, eligible runner-up is found
                   positions[positionIndex].winnerCandidateId = runnersUp[0].id;
                 } else {
-                  // A tie for runner-up, needs manual resolution again
+                  // A tie for runner-up among eligible candidates, needs manual resolution again
                   positions[positionIndex].winnerCandidateId = null;
                 }
               } else {
-                 // No runner up with any votes
+                 // No eligible runner up with any votes
                 positions[positionIndex].winnerCandidateId = null;
               }
             } else {
-               // No candidates left after forfeiture
+               // No eligible candidates left after forfeiture and filtering existing winners
                positions[positionIndex].winnerCandidateId = null;
             }
 
