@@ -244,12 +244,12 @@ export default function ElectionResultsPage() {
     let resolutionPromise;
 
     if (currentConflict.type === 'tie') {
+      // For a tie, the resolution value is the winner's candidate ID.
       resolutionPromise = declareWinner(room.id, currentConflict.position.id, selectedResolution, adminPassword, {});
     } else if (currentConflict.type === 'multi-win') {
       // For multi-win, the resolution value is the position ID to keep.
       const winningPositionId = selectedResolution;
       
-      // We need to find the correct candidate ID for the winning position.
       const winningPosition = currentConflict.positions.find((p: Position) => p.id === winningPositionId);
       const candidateInWinningPosition = winningPosition.candidates.find((c: Candidate) => c.name === currentConflict.name);
       
@@ -262,14 +262,19 @@ export default function ElectionResultsPage() {
 
       const candidateIdToWin = candidateInWinningPosition.id;
 
-      const forfeitPromises = currentConflict.positions
+      // Create an array of promises: one to declare the winner, others to forfeit.
+      const allPromises = [
+        declareWinner(room.id, winningPositionId, candidateIdToWin, adminPassword, {})
+      ];
+      
+      currentConflict.positions
         .filter((p: Position) => p.id !== winningPositionId)
-        .map((p: Position) => declareWinner(room.id, p.id, 'forfeited', adminPassword, { forfeitedByCandidateName: currentConflict.name }));
+        .forEach((p: Position) => {
+          allPromises.push(declareWinner(room.id, p.id, 'forfeited', adminPassword, { forfeitedByCandidateName: currentConflict.name }));
+        });
 
-      resolutionPromise = Promise.all([
-        declareWinner(room.id, winningPositionId, candidateIdToWin, adminPassword, {}),
-        ...forfeitPromises
-      ]);
+      resolutionPromise = Promise.all(allPromises);
+
     } else {
         setIsResolving(false);
         return;
@@ -515,7 +520,7 @@ export default function ElectionResultsPage() {
       return 'Two or more candidates have the same number of votes. Please manually select one candidate as the official winner for this position.';
     }
     if (currentConflict.type === 'multi-win') {
-      return `Candidate ${currentConflict.name} has won in multiple positions: ${currentConflict.positions.map((p: Position) => p.title).join(' and ')}. Please choose the preferred position to assign them as the final winner.`;
+      return `Candidate ${currentConflict.name} has won in multiple positions. After consulting with them, please choose which position they will retain. The other position(s) will be automatically assigned to the runner-up.`;
     }
     return "";
   };

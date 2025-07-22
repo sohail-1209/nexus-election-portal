@@ -317,19 +317,22 @@ export async function declareWinner(
             if (candidatesWithVotes.length > 0) {
               candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
               
-              const topVoteCount = candidatesWithVotes[0].voteCount || 0;
+              const topVoteCount = candidatesWithVotes[0]?.voteCount || 0;
+
               if (topVoteCount > 0) {
                 const runnersUp = candidatesWithVotes.filter((c: Candidate) => (c.voteCount || 0) === topVoteCount);
-                
                 if (runnersUp.length === 1) {
                   positions[positionIndex].winnerCandidateId = runnersUp[0].id;
                 } else {
+                  // A tie for runner-up, needs manual resolution again
                   positions[positionIndex].winnerCandidateId = null;
                 }
               } else {
+                 // No runner up with any votes
                 positions[positionIndex].winnerCandidateId = null;
               }
             } else {
+               // No candidates left after forfeiture
                positions[positionIndex].winnerCandidateId = null;
             }
 
