@@ -269,7 +269,7 @@ export async function declareWinner(
     positionId: string, 
     winnerCandidateId: string,
     adminPassword: string,
-    options: { forfeitedBy?: string } = {}
+    options: { forfeitedByCandidateName?: string } = {}
 ): Promise<{ success: boolean, message: string }> {
   const roomRef = doc(db, "electionRooms", roomId);
   const user = auth.currentUser;
@@ -312,7 +312,7 @@ export async function declareWinner(
                     ...c,
                     voteCount: voteCounts.get(c.id) || 0,
                 }))
-                .filter((c: Candidate) => c.id !== options.forfeitedBy);
+                .filter((c: Candidate) => c.name !== options.forfeitedByCandidateName);
 
             if (candidatesWithVotes.length > 0) {
               candidatesWithVotes.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
@@ -322,23 +322,18 @@ export async function declareWinner(
                 const runnersUp = candidatesWithVotes.filter((c: Candidate) => (c.voteCount || 0) === topVoteCount);
                 
                 if (runnersUp.length === 1) {
-                  // Clear winner among remaining candidates
                   positions[positionIndex].winnerCandidateId = runnersUp[0].id;
                 } else {
-                  // No clear winner, there's a tie for the runner-up spot. Mark as unresolved.
                   positions[positionIndex].winnerCandidateId = null;
                 }
               } else {
-                // No votes for any remaining candidates
                 positions[positionIndex].winnerCandidateId = null;
               }
             } else {
-               // No other candidates, position becomes vacant
                positions[positionIndex].winnerCandidateId = null;
             }
 
         } else {
-            // Standard tie-break winner declaration
             const candidateExists = positions[positionIndex].candidates.some((c: Candidate) => c.id === winnerCandidateId);
             if(!candidateExists) {
               throw new Error("Selected winner does not exist in this position.");

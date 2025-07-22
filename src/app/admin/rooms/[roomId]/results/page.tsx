@@ -174,38 +174,41 @@ export default function ElectionResultsPage() {
     
     // Data structures for conflict detection
     const ties: { position: Position; candidates: Candidate[] }[] = [];
-    const winsByCandidateId = new Map<string, { name: string; positions: Position[] }>();
+    const winsByCandidateName = new Map<string, { candidate: Candidate; positions: Position[] }>();
 
-    // 1. Find winners for each unresolved position and populate the wins map
+    // 1. Iterate through each unresolved position to find winners and ties
     for (const position of unresolvedPositions) {
       if (position.candidates.length === 0) continue;
 
       const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
       const topVoteCount = sortedCandidates[0]?.voteCount || 0;
-
+      
       if (topVoteCount > 0) {
         const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         
-        // 2. Add all winners (including ties) to the central wins tracker
+        // Add all winners to the central wins tracker, keyed by candidate NAME for uniqueness
         for (const winner of currentWinners) {
-          const existing = winsByCandidateId.get(winner.id) || { name: winner.name, positions: [] };
-          existing.positions.push(position);
-          winsByCandidateId.set(winner.id, existing);
+          const existing = winsByCandidateName.get(winner.name) || { candidate: winner, positions: [] };
+          // Avoid adding the same position twice if it's already there
+          if (!existing.positions.some(p => p.id === position.id)) {
+            existing.positions.push(position);
+          }
+          winsByCandidateName.set(winner.name, existing);
         }
 
-        // 3. Check for a tie within this specific position
+        // Check for a tie within this specific position
         if (currentWinners.length > 1) {
           ties.push({ position, candidates: currentWinners });
         }
       }
     }
-
-    // 4. Determine multi-wins from the populated map
-    const multiWins = Array.from(winsByCandidateId.entries())
-      .filter(([, data]) => data.positions.length > 1)
-      .map(([candidateId, data]) => ({
-        candidateId,
-        name: data.name,
+    
+    // 2. Determine multi-wins from the populated map
+    const multiWins = Array.from(winsByCandidateName.values())
+      .filter(data => data.positions.length > 1)
+      .map(data => ({
+        candidateId: data.candidate.id, // We need one ID for resolution
+        name: data.candidate.name,
         positions: data.positions,
       }));
 
@@ -243,15 +246,28 @@ export default function ElectionResultsPage() {
     if (currentConflict.type === 'tie') {
       resolutionPromise = declareWinner(room.id, currentConflict.position.id, selectedResolution, adminPassword, {});
     } else if (currentConflict.type === 'multi-win') {
-      const candidateId = currentConflict.candidateId;
+      // For multi-win, the resolution value is the position ID to keep.
       const winningPositionId = selectedResolution;
       
+      // We need to find the correct candidate ID for the winning position.
+      const winningPosition = currentConflict.positions.find((p: Position) => p.id === winningPositionId);
+      const candidateInWinningPosition = winningPosition.candidates.find((c: Candidate) => c.name === currentConflict.name);
+      
+      if (!candidateInWinningPosition) {
+        toast({ variant: 'destructive', title: "Resolution Failed", description: "Could not find the winning candidate in the selected position." });
+        setIsResolving(false);
+        setIsPasswordDialogOpen(false);
+        return;
+      }
+
+      const candidateIdToWin = candidateInWinningPosition.id;
+
       const forfeitPromises = currentConflict.positions
         .filter((p: Position) => p.id !== winningPositionId)
-        .map((p: Position) => declareWinner(room.id, p.id, 'forfeited', adminPassword, { forfeitedBy: candidateId }));
+        .map((p: Position) => declareWinner(room.id, p.id, 'forfeited', adminPassword, { forfeitedByCandidateName: currentConflict.name }));
 
       resolutionPromise = Promise.all([
-        declareWinner(room.id, winningPositionId, candidateId, adminPassword, {}),
+        declareWinner(room.id, winningPositionId, candidateIdToWin, adminPassword, {}),
         ...forfeitPromises
       ]);
     } else {
