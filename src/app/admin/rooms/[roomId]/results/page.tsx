@@ -1,5 +1,3 @@
-
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, FormEvent } from "react";
@@ -9,6 +7,7 @@ import { auth } from "@/lib/firebaseClient";
 import { getElectionRoomById, getVotersForRoom, declareWinner } from "@/lib/electionRoomService";
 import type { ElectionRoom, Candidate, Position, Voter } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code, File, FileText, BadgeHelp, CheckCircle, Eye, EyeOff } from "lucide-react";
@@ -106,6 +105,7 @@ export default function ElectionResultsPage() {
   const router = useRouter();
   const roomId = params.roomId as string;
   const { toast } = useToast();
+  const { triggerNotification } = useNotificationStore();
   
   const [room, setRoom] = useState<ElectionRoom | null>(null);
   const [totalCompletedVoters, setTotalCompletedVoters] = useState(0);
@@ -114,6 +114,7 @@ export default function ElectionResultsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [isConflictDialogOpen, setIsConflictDialogOpen] = useState(false);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [currentConflict, setCurrentConflict] = useState<any>(null);
   const [selectedResolution, setSelectedResolution] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
@@ -168,15 +169,17 @@ export default function ElectionResultsPage() {
         return { ties: [], multiWins: [], allConflictsResolved: true };
     }
 
-    const allCandidatesFlat = room.positions.flatMap(p => p.candidates.map(c => ({...c, positionTitle: p.title, positionId: p.id})));
+    const allCandidatesFlat = room.positions.flatMap(p => 
+        p.candidates.map(c => ({...c, positionTitle: p.title, positionId: p.id}))
+    );
     const candidateIdToNameMap = new Map(allCandidatesFlat.map(c => [c.id, c.name]));
+
     const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
     const ties: { position: Position; candidates: Candidate[] }[] = [];
+    const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
 
-    // Determine all "winners" for each unresolved position.
-    for (const position of room.positions) {
-        if (position.winnerCandidateId) continue; // Skip resolved positions
-        if (position.candidates.length === 0) continue;
+    unresolvedPositions.forEach(position => {
+        if (position.candidates.length === 0) return;
 
         const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         const topVoteCount = sortedCandidates[0]?.voteCount || 0;
@@ -190,18 +193,23 @@ export default function ElectionResultsPage() {
             
             for (const winner of currentWinners) {
                 const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
-                existing.positions.push(position);
+                if (!existing.positions.some(p => p.id === position.id)) {
+                    existing.positions.push(position);
+                }
                 winsByCandidate.set(winner.id, existing);
             }
         }
-    }
+    });
     
     const multiWins = Array.from(winsByCandidate.entries())
-        .filter(([, data]) => data.positions.length > 1)
+        .filter(([, data]) => {
+            const unwonPositions = data.positions.filter(p => !p.winnerCandidateId);
+            return unwonPositions.length > 1;
+        })
         .map(([candidateId, data]) => ({
             candidateId,
             name: data.name,
-            positions: data.positions,
+            positions: data.positions.filter(p => !p.winnerCandidateId),
         }));
 
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0 && room.positions.every(p => p.winnerCandidateId || p.candidates.length === 0);
@@ -213,10 +221,20 @@ export default function ElectionResultsPage() {
   const openConflictDialog = (conflict: any) => {
     setCurrentConflict(conflict);
     setSelectedResolution(null);
-    setAdminPassword("");
-    setShowPassword(false);
     setIsConflictDialogOpen(true);
   };
+  
+  const handleConfirmResolution = (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedResolution) {
+        toast({ variant: "destructive", title: "No Selection", description: "Please select a resolution option." });
+        return;
+    }
+    setIsConflictDialogOpen(false);
+    setIsPasswordDialogOpen(true);
+    setAdminPassword("");
+    setShowPassword(false);
+  }
 
   const handleResolveConflict = async (e: FormEvent) => {
     e.preventDefault();
@@ -247,13 +265,14 @@ export default function ElectionResultsPage() {
     try {
       await resolutionPromise;
       toast({ title: "Conflict Resolved", description: "The winner has been officially recorded. Refreshing results..." });
+      triggerNotification();
       await fetchRoomData(); // Re-fetch data to update UI
-    } catch (error: any) {
+    } catch (error: any) => {
       console.error("Error resolving conflict:", error);
       toast({ variant: 'destructive', title: "Resolution Failed", description: error.message || "Could not save the resolution. Please try again." });
     } finally {
       setIsResolving(false);
-      setIsConflictDialogOpen(false);
+      setIsPasswordDialogOpen(false);
       setCurrentConflict(null);
     }
   };
@@ -488,6 +507,12 @@ export default function ElectionResultsPage() {
     return "";
   };
 
+  const isConflictInPosition = (positionId: string) => {
+    const isInTie = conflicts.ties.some(t => t.position.id === positionId);
+    const isInMultiWin = conflicts.multiWins.some(mw => mw.positions.some((p:Position) => p.id === positionId));
+    return isInTie || isInMultiWin;
+  }
+
   return (
     <>
     <div className="space-y-8">
@@ -542,7 +567,7 @@ export default function ElectionResultsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
                 {conflicts.ties.map((tie: any, index: number) => (
-                    <Alert key={`tie-${index}`} variant="destructive" className="border-destructive/30">
+                    <Alert key={`tie-${index}`} variant="destructive" className="border-rose-500/30 bg-rose-500/5">
                         <AlertTitle>Tie Detected in: {tie.position.title}</AlertTitle>
                         <AlertDescription>
                             The following candidates received the same number of votes: {tie.candidates.map((c: Candidate) => c.name).join(', ')}.
@@ -553,7 +578,7 @@ export default function ElectionResultsPage() {
                     </Alert>
                 ))}
                 {conflicts.multiWins.map((mw: any, index: number) => (
-                     <Alert key={`mw-${index}`} variant="destructive" className="border-destructive/30">
+                     <Alert key={`mw-${index}`} variant="destructive" className="border-rose-500/30 bg-rose-500/5">
                         <AlertTitle>Multiple Wins Detected for: {mw.name}</AlertTitle>
                         <AlertDescription>
                            This candidate won multiple positions: {mw.positions.map((p: Position) => p.title).join(', ')}. Please select one position for them to hold.
@@ -623,7 +648,7 @@ export default function ElectionResultsPage() {
                       </CardDescription>
                   </CardHeader>
                   <CardContent>
-                      <ResultsTable positions={room.positions} totalCompletedVoters={totalCompletedVoters} />
+                      <ResultsTable positions={room.positions} totalCompletedVoters={totalCompletedVoters} isConflictInPosition={isConflictInPosition} />
                   </CardContent>
               </Card>
           </TabsContent>
@@ -631,10 +656,10 @@ export default function ElectionResultsPage() {
       )}
     </div>
 
-    {/* Conflict Resolution Dialog */}
+    {/* Conflict Resolution Dialog - Step 1: Select Resolution */}
     <AlertDialog open={isConflictDialogOpen} onOpenChange={setIsConflictDialogOpen}>
         <AlertDialogContent asChild>
-          <form onSubmit={handleResolveConflict}>
+          <form onSubmit={handleConfirmResolution}>
             <AlertDialogHeader>
             <AlertDialogTitle>
                 Resolve Election Conflict: {currentConflict?.type === 'tie' ? `Tie in ${currentConflict.position.title}` : `Multiple Wins for ${currentConflict?.name}`}
@@ -658,39 +683,58 @@ export default function ElectionResultsPage() {
                         </div>
                     ))}
                 </RadioGroup>
-
-                <div className="space-y-2">
-                  <Label htmlFor="admin-password">Your Admin Password</Label>
-                  <div className="relative">
-                    <Input
-                        id="admin-password"
-                        type={showPassword ? "text" : "password"}
-                        value={adminPassword}
-                        onChange={(e) => setAdminPassword(e.target.value)}
-                        placeholder="Enter password to confirm"
-                        autoFocus
-                        className="pr-10"
-                    />
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        aria-label={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-5 w-5 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-5 w-5 text-muted-foreground" />
-                        )}
-                    </Button>
-                  </div>
-                </div>
             </div>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction type="submit" disabled={!selectedResolution || isResolving || !adminPassword}>
+              <AlertDialogAction type="submit" disabled={!selectedResolution}>
+                  Confirm
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </form>
+        </AlertDialogContent>
+    </AlertDialog>
+
+    {/* Password Confirmation Dialog - Step 2 */}
+    <AlertDialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+        <AlertDialogContent asChild>
+          <form onSubmit={handleResolveConflict}>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Confirm Resolution</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Please enter your account password to confirm this change. This action is final and cannot be undone.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="py-4 space-y-2">
+                <Label htmlFor="admin-password">Your Admin Password</Label>
+                <div className="relative">
+                <Input
+                    id="admin-password"
+                    type={showPassword ? "text" : "password"}
+                    value={adminPassword}
+                    onChange={(e) => setAdminPassword(e.target.value)}
+                    placeholder="Enter password to confirm"
+                    autoFocus
+                    className="pr-10"
+                />
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                    {showPassword ? (
+                        <EyeOff className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                        <Eye className="h-5 w-5 text-muted-foreground" />
+                    )}
+                </Button>
+                </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setCurrentConflict(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction type="submit" disabled={isResolving || !adminPassword}>
                   {isResolving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Declare Winner
               </AlertDialogAction>
