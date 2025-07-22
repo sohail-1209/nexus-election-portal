@@ -307,23 +307,26 @@ export async function declareWinner(
                 }
             });
 
-            // Get a set of all candidates who have already won another position
-            const existingWinners = new Set<string>();
+            // Get a set of all candidates who have already been declared official winners
+            const existingWinnerIds = new Set<string>();
             positions.forEach(p => {
               if (p.winnerCandidateId) {
-                existingWinners.add(p.winnerCandidateId);
+                existingWinnerIds.add(p.winnerCandidateId);
               }
             });
 
-            const candidatesWithVotes = positions[positionIndex].candidates
-                .map((c: Candidate) => ({
+            const candidatesInPosition = positions[positionIndex].candidates;
+            
+            // Find the ID of the forfeiting candidate
+            const forfeitingCandidate = candidatesInPosition.find(c => c.name === options.forfeitedByCandidateName);
+
+            const eligibleCandidates = candidatesInPosition
+                .filter(c => c.id !== forfeitingCandidate?.id && !existingWinnerIds.has(c.id))
+                .map(c => ({
                     ...c,
                     voteCount: voteCounts.get(c.id) || 0,
-                }))
-                .filter((c: Candidate) => c.name !== options.forfeitedByCandidateName);
+                }));
 
-             // Filter out candidates who have already won another position
-            const eligibleCandidates = candidatesWithVotes.filter(c => !existingWinners.has(c.id));
 
             if (eligibleCandidates.length > 0) {
               eligibleCandidates.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
