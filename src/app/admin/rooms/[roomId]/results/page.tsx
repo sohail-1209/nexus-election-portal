@@ -165,53 +165,52 @@ export default function ElectionResultsPage() {
     return () => unsubscribe();
   }, [roomId, router, fetchRoomData]);
 
-  const conflicts = useMemo(() => {
+ const conflicts = useMemo(() => {
     if (!room || room.status !== 'closed' || room.roomType === 'review') {
       return { ties: [], multiWins: [], allConflictsResolved: true };
     }
-  
+
     const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
-    const candidateIdToNameMap = new Map(
-      room.positions.flatMap(p => p.candidates).map(c => [c.id, c.name])
-    );
-  
+    
+    // Data structures for conflict detection
     const ties: { position: Position; candidates: Candidate[] }[] = [];
-    const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
-  
-    unresolvedPositions.forEach(position => {
-      if (position.candidates.length === 0) return;
-  
+    const winsByCandidateId = new Map<string, { name: string; positions: Position[] }>();
+
+    // 1. Find winners for each unresolved position and populate the wins map
+    for (const position of unresolvedPositions) {
+      if (position.candidates.length === 0) continue;
+
       const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
       const topVoteCount = sortedCandidates[0]?.voteCount || 0;
-  
+
       if (topVoteCount > 0) {
         const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         
+        // 2. Add all winners (including ties) to the central wins tracker
+        for (const winner of currentWinners) {
+          const existing = winsByCandidateId.get(winner.id) || { name: winner.name, positions: [] };
+          existing.positions.push(position);
+          winsByCandidateId.set(winner.id, existing);
+        }
+
+        // 3. Check for a tie within this specific position
         if (currentWinners.length > 1) {
           ties.push({ position, candidates: currentWinners });
         }
-  
-        // All candidates with top votes are considered "winners" for multi-win check
-        for (const winner of currentWinners) {
-          const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
-          if (!existing.positions.some(p => p.id === position.id)) {
-            existing.positions.push(position);
-          }
-          winsByCandidate.set(winner.id, existing);
-        }
       }
-    });
-  
-    const multiWins = Array.from(winsByCandidate.entries())
+    }
+
+    // 4. Determine multi-wins from the populated map
+    const multiWins = Array.from(winsByCandidateId.entries())
       .filter(([, data]) => data.positions.length > 1)
       .map(([candidateId, data]) => ({
         candidateId,
         name: data.name,
         positions: data.positions,
       }));
-  
+
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
-  
+
     return { ties, multiWins, allConflictsResolved };
   }, [room]);
 
@@ -748,5 +747,3 @@ export default function ElectionResultsPage() {
     </>
   );
 }
-
-    
