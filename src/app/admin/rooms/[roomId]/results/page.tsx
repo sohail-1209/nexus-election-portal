@@ -165,46 +165,44 @@ export default function ElectionResultsPage() {
 
   const conflicts = useMemo(() => {
     if (!room || room.status !== 'closed' || room.roomType === 'review') {
-      return { ties: [], multiWins: [], allConflictsResolved: true };
+        return { ties: [], multiWins: [], allConflictsResolved: true };
     }
-    
-    const allCandidatesFlat = room.positions.flatMap(p => p.candidates);
+
+    const allCandidatesFlat = room.positions.flatMap(p => p.candidates.map(c => ({...c, positionTitle: p.title, positionId: p.id})));
     const candidateIdToNameMap = new Map(allCandidatesFlat.map(c => [c.id, c.name]));
     const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
     const ties: { position: Position; candidates: Candidate[] }[] = [];
 
-    // First, determine all "winners" for each unresolved position.
-    // A winner is anyone with the highest vote count. This can be multiple people in a tie.
+    // Determine all "winners" for each unresolved position.
     for (const position of room.positions) {
-      if (position.winnerCandidateId) continue; // Skip resolved positions
+        if (position.winnerCandidateId) continue; // Skip resolved positions
+        if (position.candidates.length === 0) continue;
 
-      if (position.candidates.length === 0) continue;
+        const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        const topVoteCount = sortedCandidates[0]?.voteCount || 0;
 
-      const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-      const topVoteCount = sortedCandidates[0]?.voteCount || 0;
-
-      if (topVoteCount > 0) {
-        const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-        
-        if (currentWinners.length > 1) {
-          ties.push({ position, candidates: currentWinners });
+        if (topVoteCount > 0) {
+            const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+            
+            if (currentWinners.length > 1) {
+                ties.push({ position, candidates: currentWinners });
+            }
+            
+            for (const winner of currentWinners) {
+                const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
+                existing.positions.push(position);
+                winsByCandidate.set(winner.id, existing);
+            }
         }
-        
-        for (const winner of currentWinners) {
-            const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
-            existing.positions.push(position);
-            winsByCandidate.set(winner.id, existing);
-        }
-      }
     }
     
     const multiWins = Array.from(winsByCandidate.entries())
-      .filter(([, data]) => data.positions.length > 1)
-      .map(([candidateId, data]) => ({
-        candidateId,
-        name: data.name,
-        positions: data.positions,
-      }));
+        .filter(([, data]) => data.positions.length > 1)
+        .map(([candidateId, data]) => ({
+            candidateId,
+            name: data.name,
+            positions: data.positions,
+        }));
 
     const allConflictsResolved = ties.length === 0 && multiWins.length === 0 && room.positions.every(p => p.winnerCandidateId || p.candidates.length === 0);
 
@@ -427,15 +425,13 @@ export default function ElectionResultsPage() {
 
     const officialWinners = room.positions
         .map(p => {
-            const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
+            const winner = p.candidates.find(c => c.isOfficialWinner);
             return winner ? { ...winner, positionTitle: p.title } : null;
         })
-        .filter(w => w !== null);
+        .filter((w): w is Candidate & { positionTitle: string } => w !== null);
 
     officialWinners.forEach((winner, index) => {
-        if(winner) {
-            mdContent += `| ${index + 1} | ${winner.positionTitle} | ${winner.name} | ${winner.voteCount || 0} |\n`;
-        }
+        mdContent += `| ${index + 1} | ${winner.positionTitle} | ${winner.name} | ${winner.voteCount || 0} |\n`;
     });
 
     const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
@@ -522,7 +518,7 @@ export default function ElectionResultsPage() {
                         <FileText className="mr-2 h-4 w-4" />
                         Export as .md Code
                     </DropdownMenuItem>
-                     {room.status === 'closed' && room.roomType !== 'review' && (
+                     {room.status === 'closed' && room.roomType === 'voting' && (
                         <>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={handleExportFinalReport} disabled={!conflicts.allConflictsResolved}>
