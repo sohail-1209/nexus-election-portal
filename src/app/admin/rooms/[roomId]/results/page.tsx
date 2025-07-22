@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback, FormEvent } from "react";
@@ -166,54 +167,51 @@ export default function ElectionResultsPage() {
 
   const conflicts = useMemo(() => {
     if (!room || room.status !== 'closed' || room.roomType === 'review') {
-        return { ties: [], multiWins: [], allConflictsResolved: true };
+      return { ties: [], multiWins: [], allConflictsResolved: true };
     }
-
-    const allCandidatesFlat = room.positions.flatMap(p => 
-        p.candidates.map(c => ({...c, positionTitle: p.title, positionId: p.id}))
-    );
-    const candidateIdToNameMap = new Map(allCandidatesFlat.map(c => [c.id, c.name]));
-
-    const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
-    const ties: { position: Position; candidates: Candidate[] }[] = [];
+  
     const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
-
+    const candidateIdToNameMap = new Map(
+      room.positions.flatMap(p => p.candidates).map(c => [c.id, c.name])
+    );
+  
+    const ties: { position: Position; candidates: Candidate[] }[] = [];
+    const winsByCandidate = new Map<string, { name: string; positions: Position[] }>();
+  
     unresolvedPositions.forEach(position => {
-        if (position.candidates.length === 0) return;
-
-        const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-        const topVoteCount = sortedCandidates[0]?.voteCount || 0;
-
-        if (topVoteCount > 0) {
-            const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-            
-            if (currentWinners.length > 1) {
-                ties.push({ position, candidates: currentWinners });
-            }
-            
-            for (const winner of currentWinners) {
-                const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
-                if (!existing.positions.some(p => p.id === position.id)) {
-                    existing.positions.push(position);
-                }
-                winsByCandidate.set(winner.id, existing);
-            }
+      if (position.candidates.length === 0) return;
+  
+      const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      const topVoteCount = sortedCandidates[0]?.voteCount || 0;
+  
+      if (topVoteCount > 0) {
+        const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
+        
+        if (currentWinners.length > 1) {
+          ties.push({ position, candidates: currentWinners });
         }
+  
+        // All candidates with top votes are considered "winners" for multi-win check
+        for (const winner of currentWinners) {
+          const existing = winsByCandidate.get(winner.id) || { name: candidateIdToNameMap.get(winner.id)!, positions: [] };
+          if (!existing.positions.some(p => p.id === position.id)) {
+            existing.positions.push(position);
+          }
+          winsByCandidate.set(winner.id, existing);
+        }
+      }
     });
-    
+  
     const multiWins = Array.from(winsByCandidate.entries())
-        .filter(([, data]) => {
-            const unwonPositions = data.positions.filter(p => !p.winnerCandidateId);
-            return unwonPositions.length > 1;
-        })
-        .map(([candidateId, data]) => ({
-            candidateId,
-            name: data.name,
-            positions: data.positions.filter(p => !p.winnerCandidateId),
-        }));
-
-    const allConflictsResolved = ties.length === 0 && multiWins.length === 0 && room.positions.every(p => p.winnerCandidateId || p.candidates.length === 0);
-
+      .filter(([, data]) => data.positions.length > 1)
+      .map(([candidateId, data]) => ({
+        candidateId,
+        name: data.name,
+        positions: data.positions,
+      }));
+  
+    const allConflictsResolved = ties.length === 0 && multiWins.length === 0;
+  
     return { ties, multiWins, allConflictsResolved };
   }, [room]);
 
@@ -267,7 +265,7 @@ export default function ElectionResultsPage() {
       toast({ title: "Conflict Resolved", description: "The winner has been officially recorded. Refreshing results..." });
       triggerNotification();
       await fetchRoomData(); // Re-fetch data to update UI
-    } catch (error: any) => {
+    } catch (error: any) {
       console.error("Error resolving conflict:", error);
       toast({ variant: 'destructive', title: "Resolution Failed", description: error.message || "Could not save the resolution. Please try again." });
     } finally {
@@ -750,3 +748,5 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
