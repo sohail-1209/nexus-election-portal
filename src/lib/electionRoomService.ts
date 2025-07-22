@@ -297,44 +297,49 @@ export async function declareWinner(
         }
 
         if (winnerCandidateId === 'forfeited') {
-            const votesSnap = await getDocs(collection(db, "electionRooms", roomId, "votes"));
-            const voteCounts = new Map<string, number>();
-            votesSnap.forEach(voteDoc => {
-                const voteData = voteDoc.data();
-                if (voteData.positionId === positionId) {
-                  const candId = voteData.candidateId;
-                  voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
-                }
-            });
-
-            // Get a set of all candidates who have already been declared official winners
+            // New, robust runner-up logic
+            const currentPositionsState: Position[] = roomDoc.data().positions || [];
+            
+            // 1. Identify all candidates who have already been declared official winners
             const existingWinnerIds = new Set<string>();
-            positions.forEach(p => {
+            currentPositionsState.forEach(p => {
               if (p.winnerCandidateId) {
                 existingWinnerIds.add(p.winnerCandidateId);
               }
             });
 
-            const candidatesInPosition = positions[positionIndex].candidates;
-            
-            // Find the ID of the forfeiting candidate
-            const forfeitingCandidate = candidatesInPosition.find(c => c.name === options.forfeitedByCandidateName);
+            // 2. Find the ID of the candidate who is forfeiting this position
+            const candidatesInForfeitedPosition: Candidate[] = currentPositionsState[positionIndex].candidates;
+            const forfeitingCandidate = candidatesInForfeitedPosition.find(c => c.name === options.forfeitedByCandidateName);
+            if(forfeitingCandidate) {
+              existingWinnerIds.add(forfeitingCandidate.id); // Also exclude the forfeiting candidate from winning again
+            }
 
-            const eligibleCandidates = candidatesInPosition
-                .filter(c => c.id !== forfeitingCandidate?.id && !existingWinnerIds.has(c.id))
+            // 3. Get vote counts for the specific forfeited position
+            const votesSnap = await getDocs(query(collection(db, "electionRooms", roomId, "votes"), where("positionId", "==", positionId)));
+            const voteCounts = new Map<string, number>();
+            votesSnap.forEach(voteDoc => {
+                const candId = voteDoc.data().candidateId;
+                voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
+            });
+            
+            // 4. Find all *eligible* candidates for the runner-up spot
+            const eligibleCandidates = candidatesInForfeitedPosition
+                .filter(c => !existingWinnerIds.has(c.id)) // Must not be an existing winner or the one who forfeited
                 .map(c => ({
                     ...c,
                     voteCount: voteCounts.get(c.id) || 0,
                 }));
 
 
+            // 5. Determine the new winner from the eligible pool
             if (eligibleCandidates.length > 0) {
               eligibleCandidates.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
               
               const topVoteCount = eligibleCandidates[0]?.voteCount || 0;
 
               if (topVoteCount > 0) {
-                const runnersUp = eligibleCandidates.filter((c: Candidate) => (c.voteCount || 0) === topVoteCount);
+                const runnersUp = eligibleCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
                 if (runnersUp.length === 1) {
                   // A clear, eligible runner-up is found
                   positions[positionIndex].winnerCandidateId = runnersUp[0].id;
