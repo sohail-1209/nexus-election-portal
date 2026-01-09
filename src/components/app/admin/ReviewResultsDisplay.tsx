@@ -14,12 +14,17 @@ interface ReviewResultsDisplayProps {
 }
 
 export default function ReviewResultsDisplay({ room }: ReviewResultsDisplayProps) {
-  const [showAllFeedback, setShowAllFeedback] = useState(false);
+  const [openFeedbackPositionId, setOpenFeedbackPositionId] = useState<string | null>(null);
+
+  const toggleFeedbackVisibility = (positionId: string) => {
+    setOpenFeedbackPositionId(prevId => prevId === positionId ? null : positionId);
+  };
   
   return (
     <div className="space-y-6">
       {room.positions.map(position => {
         const totalReviews = position.reviews?.length || 0;
+        const isFeedbackVisible = openFeedbackPositionId === position.id;
 
         return (
             <Card key={position.id} className="shadow-lg">
@@ -42,17 +47,16 @@ export default function ReviewResultsDisplay({ room }: ReviewResultsDisplayProps
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex justify-between items-center mb-4">
-                        <h4 className="text-md font-semibold text-muted-foreground">Individual Feedback</h4>
+                    <div className="flex justify-end items-center mb-4">
                         {totalReviews > 0 && (
-                            <Button variant="outline" size="sm" onClick={() => setShowAllFeedback(!showAllFeedback)}>
-                                {showAllFeedback ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
-                                {showAllFeedback ? "Hide Feedback" : "View All Feedback"}
+                            <Button variant="outline" size="sm" onClick={() => toggleFeedbackVisibility(position.id)}>
+                                {isFeedbackVisible ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+                                {isFeedbackVisible ? "Hide Feedback" : "View All Feedback"}
                             </Button>
                         )}
                     </div>
                     {totalReviews > 0 ? (
-                        showAllFeedback && (
+                        isFeedbackVisible && (
                             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
                                 {position.reviews?.map((review, index) => (
                                     <div key={index} className="border bg-muted/30 rounded-lg p-4">
