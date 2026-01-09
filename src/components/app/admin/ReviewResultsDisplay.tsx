@@ -3,7 +3,6 @@
 
 import type { ElectionRoom } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import StarRating from "@/components/app/StarRating";
 import { formatDistanceToNow } from "date-fns";
 
@@ -38,29 +37,28 @@ export default function ReviewResultsDisplay({ room }: ReviewResultsDisplayProps
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <Accordion type="single" collapsible className="w-full">
-                        <AccordionItem value="item-1">
-                            <AccordionTrigger className="text-base">
-                                {`View all ${totalReviews} anonymous feedback entries`}
-                            </AccordionTrigger>
-                            <AccordionContent>
-                                {totalReviews > 0 ? (
-                                     <div className="space-y-4 pt-4 max-h-[400px] overflow-y-auto pr-2">
-                                        {position.reviews?.map((review, index) => (
-                                            <div key={index} className="border-b pb-4 last:border-b-0">
-                                                <p className="text-sm bg-muted/50 p-3 rounded-md">{review.feedback}</p>
-                                                <div className="text-xs text-muted-foreground text-right mt-1">
-                                                    Submitted {formatDistanceToNow(new Date(review.reviewedAt), { addSuffix: true })}
-                                                </div>
-                                            </div>
-                                        ))}
+                    <h4 className="text-md font-semibold mb-4 text-muted-foreground">Individual Feedback</h4>
+                    {totalReviews > 0 ? (
+                        <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                            {position.reviews?.map((review, index) => (
+                                <div key={index} className="border bg-muted/30 rounded-lg p-4">
+                                    <blockquote className="text-sm italic border-l-4 border-primary pl-4">
+                                      "{review.feedback || 'No written feedback provided.'}"
+                                    </blockquote>
+                                    <div className="flex items-center justify-between mt-3">
+                                      <StarRating rating={review.rating} onRatingChange={() => {}} disabled={true} />
+                                      <p className="text-xs text-muted-foreground">
+                                          Submitted {formatDistanceToNow(new Date(review.reviewedAt), { addSuffix: true })}
+                                      </p>
                                     </div>
-                                ) : (
-                                    <p className="text-muted-foreground text-center py-4">No written feedback was provided.</p>
-                                )}
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-12 text-muted-foreground border-dashed border-2 rounded-lg">
+                            <p>No feedback entries have been submitted for this position yet.</p>
+                        </div>
+                    )}
                 </CardContent>
             </Card>
         )
