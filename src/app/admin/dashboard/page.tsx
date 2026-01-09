@@ -1,29 +1,31 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { getElectionRooms } from "@/lib/electionRoomService";
-import type { ElectionRoom } from "@/lib/types";
+import { getElectionRoomsAndGroups } from "@/lib/electionRoomService";
+import type { ElectionRoom, ElectionGroup } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, AlertTriangle, ArrowRight, CalendarDays, Settings, BarChart3, Users, LockKeyhole, PenSquare, Trash2, Vote, Star } from "lucide-react";
+import { PlusCircle, AlertTriangle, ArrowRight, CalendarDays, Settings, BarChart3, Users, LockKeyhole, PenSquare, Vote, Star, Folder, Layers } from "lucide-react";
 import Link from "next/link";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
+import GroupRoomsDialog from "@/components/app/admin/GroupRoomsDialog";
 
-function RoomSkeleton() {
+function DashboardSkeleton() {
   return (
     <div className="space-y-8">
       <div className="flex justify-center">
         <Skeleton className="h-10 w-56" />
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3].map(i => (
+        {[1, 2, 3, 4, 5, 6].map(i => (
           <Card key={i}>
             <CardHeader>
               <Skeleton className="h-6 w-3/4" />
@@ -116,28 +118,73 @@ function RoomCard({ room }: { room: ElectionRoom }) {
     );
 }
 
+function GroupCard({ group, rooms }: { group: ElectionGroup, rooms: ElectionRoom[] }) {
+    const groupRooms = rooms.filter(r => group.roomIds.includes(r.id));
+    const activeRooms = groupRooms.filter(r => r.status === 'active').length;
+    const totalRooms = groupRooms.length;
+
+    return (
+        <Card className="flex flex-col hover:shadow-xl transition-shadow duration-300 border-2 border-primary/30">
+            <CardHeader>
+                <div className="flex justify-between items-start gap-4">
+                    <CardTitle className="text-lg font-headline mb-1 line-clamp-2 flex-grow flex items-center">
+                        <Folder className="mr-3 h-6 w-6 text-primary" />
+                        {group.name}
+                    </CardTitle>
+                </div>
+                <CardDescription className="text-sm line-clamp-3 pt-1">A group containing {totalRooms} room(s).</CardDescription>
+                <div className="flex items-center gap-2 pt-2">
+                    <Badge variant="default" className="bg-primary/80">{activeRooms} Active / {totalRooms} Total</Badge>
+                </div>
+            </CardHeader>
+            <CardContent className="flex-grow space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center">
+                    <CalendarDays className="mr-2 h-4 w-4 text-primary" /> Created: {format(new Date(group.createdAt), "PPP")}
+                </div>
+            </CardContent>
+            <CardFooter>
+                <Button variant="default" asChild className="w-full">
+                    <Link href={`/admin/groups/${group.id}`}>
+                        <ArrowRight className="mr-2 h-4 w-4" /> View Group
+                    </Link>
+                </Button>
+            </CardFooter>
+        </Card>
+    );
+}
+
+
 export default function AdminDashboardPage() {
   const [electionRooms, setElectionRooms] = useState<ElectionRoom[]>([]);
+  const [electionGroups, setElectionGroups] = useState<ElectionGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const ungroupedRooms = useMemo(() => electionRooms.filter(room => !room.groupId), [electionRooms]);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const { rooms, groups } = await getElectionRoomsAndGroups();
+      setElectionRooms(rooms);
+      setElectionGroups(groups);
+    } catch (err: any) {
+      console.error("Failed to fetch data:", err);
+      if (err.code === 'permission-denied') {
+        setError("You do not have permission to view the dashboard. Please contact support.");
+      } else {
+        setError("An unexpected error occurred while loading the dashboard. Please try again later.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        try {
-          const roomsData = await getElectionRooms();
-          setElectionRooms(roomsData);
-        } catch (err: any) {
-          console.error("Failed to fetch rooms:", err);
-          if (err.code === 'permission-denied') {
-            setError("You do not have permission to view the dashboard. Please contact support.");
-          } else {
-            setError("An unexpected error occurred while loading the dashboard. Please try again later.");
-          }
-        } finally {
-          setLoading(false);
-        }
+        fetchData();
       } else {
         router.push('/admin/login');
       }
@@ -146,7 +193,7 @@ export default function AdminDashboardPage() {
   }, [router]);
 
   if (loading) {
-    return <RoomSkeleton />;
+    return <DashboardSkeleton />;
   }
   
   if (error) {
@@ -172,7 +219,7 @@ export default function AdminDashboardPage() {
     <div className="space-y-8">
       <div className="text-center">
           <h1 className="text-3xl font-bold font-headline">Election Dashboard</h1>
-          <p className="text-muted-foreground mt-2">Manage your election rooms or create new ones.</p>
+          <p className="text-muted-foreground mt-2">Manage your election rooms and groups.</p>
       </div>
 
       <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
@@ -186,14 +233,34 @@ export default function AdminDashboardPage() {
             <PenSquare className="mr-2 h-5 w-5" /> Create New Review Room
           </Link>
         </Button>
+        {ungroupedRooms.length > 0 && (
+          <GroupRoomsDialog allRooms={ungroupedRooms} onGroupCreated={fetchData} />
+        )}
       </div>
 
-      {electionRooms.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {electionRooms.map(room => (
-              <RoomCard key={room.id} room={room} />
-            ))}
-          </div>
+      {(electionGroups.length > 0 || ungroupedRooms.length > 0) ? (
+        <>
+          {electionGroups.length > 0 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold font-headline text-center">Room Groups</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {electionGroups.map(group => (
+                  <GroupCard key={group.id} group={group} rooms={electionRooms} />
+                ))}
+              </div>
+            </div>
+          )}
+          {ungroupedRooms.length > 0 && (
+             <div className="space-y-6">
+               <h2 className="text-2xl font-semibold font-headline text-center">{electionGroups.length > 0 ? 'Ungrouped Rooms' : 'All Rooms'}</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {ungroupedRooms.map(room => (
+                    <RoomCard key={room.id} room={room} />
+                  ))}
+                </div>
+            </div>
+          )}
+        </>
       ) : (
         <Card className="text-center py-16">
           <CardHeader>

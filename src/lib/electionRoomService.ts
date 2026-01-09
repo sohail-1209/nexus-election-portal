@@ -2,79 +2,58 @@
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position, Candidate } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, ElectionGroup } from '@/lib/types';
 
 
-export async function getElectionRooms(): Promise<ElectionRoom[]> {
-  const electionRoomsCol = collection(db, "electionRooms");
-  const q = query(electionRoomsCol, orderBy("createdAt", "desc"));
-  const snapshot = await getDocs(q);
+export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[], groups: ElectionGroup[] }> {
+  const roomsCol = collection(db, "electionRooms");
+  const groupsCol = collection(db, "groups");
   
-  return snapshot.docs.map(doc => {
+  const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
+  const groupsQuery = query(groupsCol, orderBy("createdAt", "desc"));
+
+  const [roomsSnapshot, groupsSnapshot] = await Promise.all([
+    getDocs(roomsQuery),
+    getDocs(groupsQuery),
+  ]);
+
+  const rooms = roomsSnapshot.docs.map(doc => {
     const data = doc.data();
-    if (!data) {
-      // This case should ideally not happen if a document exists
-      return {
-        id: doc.id,
-        title: "Error: Missing Data",
-        description: "Document data is unexpectedly missing.",
-        isAccessRestricted: false,
-        accessCode: undefined,
-        positions: [],
-        createdAt: new Date().toISOString(),
-        status: 'pending' as ElectionRoom['status'],
-        roomType: 'voting',
-      };
-    }
-
     const createdAtRaw = data.createdAt;
-    const updatedAtRaw = data.updatedAt;
-
     const createdAt = createdAtRaw instanceof Timestamp
       ? createdAtRaw.toDate().toISOString()
       : typeof createdAtRaw === 'string'
       ? createdAtRaw 
       : new Date().toISOString(); 
 
-    const updatedAt = updatedAtRaw instanceof Timestamp
-      ? updatedAtRaw.toDate().toISOString()
-      : typeof updatedAtRaw === 'string'
-      ? updatedAtRaw
-      : undefined;
-
-    const positionsRaw = data.positions;
-    const positions = Array.isArray(positionsRaw)
-      ? positionsRaw.map((p: any) => {
-          const candidatesRaw = p?.candidates;
-          return {
-            id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
-            title: p?.title || "Untitled Position",
-            candidates: Array.isArray(candidatesRaw)
-              ? candidatesRaw.map((c: any) => ({
-                  id: c?.id || `cand-${Math.random().toString(36).substr(2, 9)}`,
-                  name: c?.name || "Unnamed Candidate",
-                  imageUrl: c?.imageUrl || '',
-                  voteCount: c?.voteCount || 0,
-                }))
-              : [],
-          };
-        })
-      : [];
-
     return {
       id: doc.id,
       title: data.title || "Untitled Election",
       description: data.description || "No description provided.",
-      isAccessRestricted: data.isAccessRestricted === true, // Ensure boolean
+      isAccessRestricted: data.isAccessRestricted === true,
       accessCode: data.accessCode || undefined,
-      positions: positions,
+      positions: data.positions || [],
       createdAt: createdAt,
-      updatedAt: updatedAt,
-      status: (data.status as ElectionRoom['status']) || 'pending',
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : undefined,
+      status: data.status || 'pending',
       roomType: data.roomType || 'voting',
-    };
+      groupId: data.groupId || undefined,
+    } as ElectionRoom;
   });
+
+  const groups = groupsSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name || "Untitled Group",
+      roomIds: data.roomIds || [],
+      createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+    } as ElectionGroup;
+  });
+
+  return { rooms, groups };
 }
+
 
 export async function getElectionRoomById(roomId: string, options: { withVoteCounts?: boolean } = {}): Promise<ElectionRoom | null> {
   const { withVoteCounts = false } = options;
@@ -192,7 +171,54 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     updatedAt: updatedAt,
     status: (data.status as ElectionRoom['status']) || 'pending',
     roomType: data.roomType || 'voting',
+    groupId: data.groupId,
   };
+}
+
+export async function getGroupById(groupId: string): Promise<ElectionGroup | null> {
+  const groupRef = doc(db, "groups", groupId);
+  const docSnap = await getDoc(groupRef);
+
+  if (!docSnap.exists()) {
+    return null;
+  }
+  
+  const data = docSnap.data();
+  if (!data) return null;
+
+  return {
+    id: docSnap.id,
+    name: data.name || "Untitled Group",
+    roomIds: data.roomIds || [],
+    createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+  };
+}
+
+export async function getRoomsForGroup(groupId: string): Promise<ElectionRoom[]> {
+  const roomsCol = collection(db, "electionRooms");
+  const q = query(roomsCol, where("groupId", "==", groupId), orderBy("createdAt", "desc"));
+  const snapshot = await getDocs(q);
+  
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    const createdAtRaw = data.createdAt;
+    const createdAt = createdAtRaw instanceof Timestamp
+      ? createdAtRaw.toDate().toISOString()
+      : typeof createdAtRaw === 'string'
+      ? createdAtRaw 
+      : new Date().toISOString();
+
+    return {
+      id: doc.id,
+      title: data.title || "Untitled Election",
+      description: data.description || "No description provided.",
+      status: data.status || 'pending',
+      roomType: data.roomType || 'voting',
+      isAccessRestricted: data.isAccessRestricted || false,
+      positions: data.positions || [],
+      createdAt,
+    } as ElectionRoom;
+  });
 }
 
 
@@ -220,6 +246,43 @@ export async function getVotersForRoom(roomId: string): Promise<Voter[]> {
   });
   
   return voters;
+}
+
+export async function createElectionGroup(groupName: string, roomIds: string[], adminPassword: string): Promise<{ success: boolean; message: string; groupId?: string }> {
+  const user = auth.currentUser;
+  if (!user || !user.email) {
+    return { success: false, message: "No authenticated user found. Please log in again." };
+  }
+
+  try {
+    const credential = EmailAuthProvider.credential(user.email, adminPassword);
+    await reauthenticateWithCredential(user, credential);
+  } catch (error) {
+    return { success: false, message: "Incorrect password. Group creation failed." };
+  }
+
+  try {
+    const batch = writeBatch(db);
+    
+    const newGroupRef = doc(collection(db, "groups"));
+    batch.set(newGroupRef, {
+      name: groupName,
+      roomIds: roomIds,
+      createdAt: serverTimestamp(),
+    });
+
+    roomIds.forEach(roomId => {
+      const roomRef = doc(db, "electionRooms", roomId);
+      batch.update(roomRef, { groupId: newGroupRef.id });
+    });
+
+    await batch.commit();
+    return { success: true, message: "Group created successfully.", groupId: newGroupRef.id };
+
+  } catch (error: any) {
+    console.error("Error creating group:", error);
+    return { success: false, message: "An unexpected error occurred while creating the group." };
+  }
 }
 
 
