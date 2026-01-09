@@ -203,7 +203,7 @@ export default function ManageElectionRoomPage() {
 
   if (loading) {
      return (
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6">
             <Skeleton className="h-10 w-48" /> 
             <Card>
                 <CardHeader>
@@ -251,7 +251,7 @@ export default function ManageElectionRoomPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Button variant="outline" asChild>
           <Link href="/admin/dashboard">
@@ -265,7 +265,7 @@ export default function ManageElectionRoomPage() {
                         <Activity className="mr-2 h-4 w-4" /> Live Status
                     </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-3xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center">
                             <Activity className="mr-3 h-6 w-6" />
