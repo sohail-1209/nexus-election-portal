@@ -9,7 +9,7 @@ import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService
 import type { ElectionRoom, Position } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users, Share2 } from "lucide-react";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -18,6 +18,15 @@ import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
 import StarRating from "@/components/app/StarRating";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import ShareableLinkDisplay from "@/components/app/admin/ShareableLinkDisplay";
 
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
@@ -82,6 +91,13 @@ export default function ElectionResultsPage() {
   const [loading, setLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [baseUrl, setBaseUrl] = useState('');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
+  }, []);
 
   const fetchRoomData = useCallback(async () => {
     if (!roomId) return;
@@ -218,6 +234,8 @@ export default function ElectionResultsPage() {
     return notFound();
   }
 
+  const shareableResultsLink = `${baseUrl}/results/${room.id}`;
+
   const renderResults = () => {
     if (room.roomType === 'review') {
         return (
@@ -259,6 +277,25 @@ export default function ElectionResultsPage() {
             <p className="text-muted-foreground mt-2">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+            {room.roomType === 'review' && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Share2 className="mr-2 h-4 w-4" /> Share
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Share Read-Only Results</DialogTitle>
+                    <DialogDescription>
+                      Anyone with this link can view the results for this review room.
+                      The page is read-only and does not require a login.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ShareableLinkDisplay voterLink={shareableResultsLink} />
+                </DialogContent>
+              </Dialog>
+            )}
             <Button disabled={isExporting} className="w-full sm:w-auto" onClick={handleExportMarkdown}>
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                 {isExporting ? 'Exporting...' : 'Export as .md Code'}
