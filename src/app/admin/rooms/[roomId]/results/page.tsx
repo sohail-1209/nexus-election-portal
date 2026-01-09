@@ -9,8 +9,8 @@ import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService
 import type { ElectionRoom, Position } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle } from "lucide-react";
-import Link from "next/link";
+import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users } from "lucide-react";
+import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
 import ResultsLoading from "./loading";
@@ -268,11 +268,22 @@ export default function ElectionResultsPage() {
 
        {room.status === 'closed' && room.roomType === 'voting' && (
          <Alert variant="default" className="border-green-600/50 bg-green-500/5">
-           <CheckCircle className="h-4 w-4 text-green-600" />
-           <AlertTitle>Election Closed</AlertTitle>
-           <AlertDescription>
-            This election is complete. The results below are final.
-           </AlertDescription>
+            <div className="flex justify-between items-center w-full">
+                <div>
+                   <AlertTitle className="flex items-center">
+                        <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
+                        Election Closed
+                    </AlertTitle>
+                   <AlertDescription>
+                    This election is complete. The results below are final.
+                   </AlertDescription>
+                </div>
+                 <Button asChild variant="outline" size="sm">
+                    <Link href={`/admin/rooms/${room.id}/voters`}>
+                        <Users className="mr-2 h-4 w-4" /> View Participant List
+                    </Link>
+                </Button>
+            </div>
          </Alert>
        )}
 

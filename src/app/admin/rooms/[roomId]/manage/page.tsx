@@ -33,37 +33,30 @@ import {
 
 function LiveStatusSkeleton() {
     return (
-        <Card className="shadow-xl">
-            <CardHeader>
-                <CardTitle className="text-xl font-headline flex items-center">
-                    <Activity className="mr-3 h-6 w-6 text-primary" />
-                    <Skeleton className="h-7 w-[300px]" />
-                </CardTitle>
-                <Skeleton className="h-4 w-[400px]" />
-            </CardHeader>
-            <CardContent>
-                 <div className="border rounded-lg">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Participant</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead className="text-right">Last Activity</TableHead>
+        <div className="space-y-4">
+            <Skeleton className="h-4 w-[400px]" />
+            <div className="border rounded-lg">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Participant</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Last Activity</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {[...Array(2)].map((_, i) => (
+                            <TableRow key={i}>
+                                <TableCell><Skeleton className="h-5 w-[100px]" /></TableCell>
+                                <TableCell><Skeleton className="h-6 w-[100px]" /></TableCell>
+                                <TableCell className="text-right"><Skeleton className="h-5 w-[100px] ml-auto" /></TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {[...Array(2)].map((_, i) => (
-                                <TableRow key={i}>
-                                    <TableCell><Skeleton className="h-5 w-[100px]" /></TableCell>
-                                    <TableCell><Skeleton className="h-6 w-[100px]" /></TableCell>
-                                    <TableCell className="text-right"><Skeleton className="h-5 w-[100px] ml-auto" /></TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </div>
-            </CardContent>
-        </Card>
+                        ))}
+                    </TableBody>
+                </Table>
+            </div>
+             <Skeleton className="h-10 w-[200px]" />
+        </div>
     )
 }
 
@@ -102,17 +95,11 @@ function LiveStatusDisplay({ room }: { room: ElectionRoom }) {
     const title = room.roomType === 'review' ? 'Reviewer' : 'Voter';
 
     return (
-        <Card className="shadow-xl">
-            <CardHeader>
-                <CardTitle className="text-xl font-headline flex items-center">
-                    <Activity className="mr-3 h-6 w-6 text-primary" />
-                    Live Participation Status
-                </CardTitle>
-                <CardDescription>
-                    {participants.length} {participants.length === 1 ? 'person has' : 'people have'} entered.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
+        <>
+            <DialogDescription>
+                {participants.length} {participants.length === 1 ? 'person has' : 'people have'} entered the room.
+            </DialogDescription>
+            <div className="space-y-4 pt-2">
                 {participants.length > 0 ? (
                     <div className="border rounded-lg max-h-80 overflow-y-auto">
                         <Table>
@@ -156,8 +143,13 @@ function LiveStatusDisplay({ room }: { room: ElectionRoom }) {
                         <p>No one has entered the room yet.</p>
                     </div>
                 )}
-            </CardContent>
-        </Card>
+                <Button asChild>
+                    <Link href={`/admin/rooms/${room.id}/voters`}>
+                        <Users className="mr-2 h-4 w-4" /> View Full Participant List
+                    </Link>
+                </Button>
+            </div>
+        </>
     );
 }
 
@@ -211,29 +203,18 @@ export default function ManageElectionRoomPage() {
 
   if (loading) {
      return (
-      <div className="max-w-7xl mx-auto space-y-6">
-        <Skeleton className="h-10 w-48" /> 
-        <div className="flex flex-col lg:flex-row gap-6">
-          <div className="lg:w-3/5">
-             <Card>
+        <div className="max-w-4xl mx-auto space-y-6">
+            <Skeleton className="h-10 w-48" /> 
+            <Card>
                 <CardHeader>
-                  <Skeleton className="h-8 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-1/2" /> 
+                    <Skeleton className="h-8 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2" /> 
                 </CardHeader>
                 <CardContent className="flex items-center justify-center h-96">
-                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
                 </CardContent>
-              </Card>
-          </div>
-          <div className="lg:w-2/5 space-y-6">
-            <LiveStatusSkeleton />
-            <Card>
-              <CardHeader><Skeleton className="h-7 w-1/2" /></CardHeader>
-              <CardContent><Skeleton className="h-10 w-1/2" /></CardContent>
             </Card>
-          </div>
         </div>
-      </div>
     );
   }
   
@@ -270,7 +251,7 @@ export default function ManageElectionRoomPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Button variant="outline" asChild>
           <Link href="/admin/dashboard">
@@ -278,6 +259,23 @@ export default function ManageElectionRoomPage() {
           </Link>
         </Button>
         <div className="flex items-center gap-2">
+            <Dialog>
+                <DialogTrigger asChild>
+                    <Button variant="outline">
+                        <Activity className="mr-2 h-4 w-4" /> Live Status
+                    </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center">
+                            <Activity className="mr-3 h-6 w-6" />
+                            Live Participation Status
+                        </DialogTitle>
+                    </DialogHeader>
+                    <LiveStatusDisplay room={room} />
+                </DialogContent>
+            </Dialog>
+
           <Dialog>
             <DialogTrigger asChild>
               <Button variant="outline">
@@ -318,41 +316,15 @@ export default function ManageElectionRoomPage() {
         </div>
       </div>
       
-      <div className="flex flex-col lg:flex-row gap-6 items-start">
-        {/* Left Column */}
-        <div className="w-full lg:w-3/5 space-y-6">
-            <Card className="shadow-xl">
-                <CardHeader>
-                <CardTitle className="text-3xl font-headline">Manage: {room.title}</CardTitle>
-                <CardDescription>Edit details, positions, candidates, and manage access for this {room.roomType} room.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                {renderForm()}
-                </CardContent>
-            </Card>
-        </div>
-
-        {/* Right Column */}
-        <div className="w-full lg:w-2/5 space-y-6 sticky top-20">
-            <LiveStatusDisplay room={room} />
-
-            <Card>
-                <CardHeader>
-                <CardTitle className="text-xl font-headline">Voter Participation</CardTitle>
-                <CardDescription>
-                    View the list of all participants who have completed their submission.
-                </CardDescription>
-                </CardHeader>
-                <CardContent>
-                <Button asChild>
-                    <Link href={`/admin/rooms/${room.id}/voters`}>
-                    <Users className="mr-2 h-4 w-4" /> View Participant List
-                    </Link>
-                </Button>
-                </CardContent>
-            </Card>
-        </div>
-      </div>
+        <Card className="shadow-xl">
+            <CardHeader>
+            <CardTitle className="text-3xl font-headline">Manage: {room.title}</CardTitle>
+            <CardDescription>Edit details, positions, candidates, and manage access for this {room.roomType} room.</CardDescription>
+            </CardHeader>
+            <CardContent>
+            {renderForm()}
+            </CardContent>
+        </Card>
     </div>
   );
 }
