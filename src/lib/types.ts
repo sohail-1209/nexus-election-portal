@@ -37,7 +37,16 @@ export interface ElectionRoom {
   updatedAt?: string; // Added for Firestore timestamp
   status: 'pending' | 'active' | 'closed';
   roomType?: 'voting' | 'review';
+  panelId: string; // Link to the election panel
 }
+
+export interface ElectionPanel {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: string;
+}
+
 
 export interface Voter {
   email: string;

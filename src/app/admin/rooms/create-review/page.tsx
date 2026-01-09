@@ -6,12 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { useSearchParams } from 'next/navigation';
 
 export default function CreateReviewRoomPage() {
+  const searchParams = useSearchParams();
+  const panelId = searchParams.get('panelId');
+
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <Button variant="outline" asChild className="mb-4">
-        <Link href="/admin/dashboard">
+        <Link href={panelId ? `/admin/panels/${panelId}` : "/admin/dashboard"}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
         </Link>
       </Button>
@@ -21,7 +25,7 @@ export default function CreateReviewRoomPage() {
           <CardDescription>A room for taking feedback/rating of the previous member of Club</CardDescription>
         </CardHeader>
         <CardContent>
-            <ReviewRoomForm />
+            <ReviewRoomForm panelId={panelId} />
         </CardContent>
       </Card>
     </div>

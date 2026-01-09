@@ -1,13 +1,43 @@
 
-
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position, Candidate } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, Candidate, ElectionPanel } from '@/lib/types';
 
-export async function getElectionRooms(): Promise<ElectionRoom[]> {
+
+export async function getElectionPanels(): Promise<ElectionPanel[]> {
+    const panelsCol = collection(db, "electionPanels");
+    const q = query(panelsCol, orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+            id: doc.id,
+            title: data.title || "Untitled Panel",
+            description: data.description || "No description",
+            createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+        }
+    });
+}
+
+export async function getPanelById(panelId: string): Promise<ElectionPanel | null> {
+    const panelRef = doc(db, "electionPanels", panelId);
+    const docSnap = await getDoc(panelRef);
+    if (!docSnap.exists()) return null;
+
+    const data = docSnap.data();
+    return {
+        id: docSnap.id,
+        title: data.title || "Untitled Panel",
+        description: data.description || "No description",
+        createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+    }
+}
+
+
+export async function getElectionRooms(panelId: string): Promise<ElectionRoom[]> {
   const electionRoomsCol = collection(db, "electionRooms");
-  const q = query(electionRoomsCol, orderBy("createdAt", "desc"));
+  const q = query(electionRoomsCol, where("panelId", "==", panelId), orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
   
   return snapshot.docs.map(doc => {
@@ -24,6 +54,7 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
         createdAt: new Date().toISOString(),
         status: 'pending' as ElectionRoom['status'],
         roomType: 'voting',
+        panelId: panelId,
       };
     }
 
@@ -73,6 +104,7 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
       updatedAt: updatedAt,
       status: (data.status as ElectionRoom['status']) || 'pending',
       roomType: data.roomType || 'voting',
+      panelId: data.panelId,
     };
   });
 }
@@ -202,6 +234,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     updatedAt: updatedAt,
     status: (data.status as ElectionRoom['status']) || 'pending',
     roomType: data.roomType || 'voting',
+    panelId: data.panelId,
   };
 }
 
@@ -297,25 +330,22 @@ export async function declareWinner(
         }
 
         if (winnerCandidateId === 'forfeited') {
-            // New, robust runner-up logic
-            const currentPositionsState: Position[] = roomDoc.data().positions || [];
+            const currentPositionsState: Position[] = (await transaction.get(roomRef)).data()?.positions || [];
             
-            // 1. Identify all candidates who have already been declared official winners
             const existingWinnerIds = new Set<string>();
             currentPositionsState.forEach(p => {
-              if (p.winnerCandidateId) {
-                existingWinnerIds.add(p.winnerCandidateId);
+              if (p.winnerCandidateId && p.id !== positionId) { // Exclude the current position being forfeited
+                const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
+                if(winner) existingWinnerIds.add(winner.name);
               }
             });
 
-            // 2. Find the ID of the candidate who is forfeiting this position
-            const candidatesInForfeitedPosition: Candidate[] = currentPositionsState[positionIndex].candidates;
+            const candidatesInForfeitedPosition: Candidate[] = positions[positionIndex].candidates;
             const forfeitingCandidate = candidatesInForfeitedPosition.find(c => c.name === options.forfeitedByCandidateName);
             if(forfeitingCandidate) {
-              existingWinnerIds.add(forfeitingCandidate.id); // Also exclude the forfeiting candidate from winning again
+              existingWinnerIds.add(forfeitingCandidate.name);
             }
 
-            // 3. Get vote counts for the specific forfeited position
             const votesSnap = await getDocs(query(collection(db, "electionRooms", roomId, "votes"), where("positionId", "==", positionId)));
             const voteCounts = new Map<string, number>();
             votesSnap.forEach(voteDoc => {
@@ -323,16 +353,14 @@ export async function declareWinner(
                 voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
             });
             
-            // 4. Find all *eligible* candidates for the runner-up spot
             const eligibleCandidates = candidatesInForfeitedPosition
-                .filter(c => !existingWinnerIds.has(c.id)) // Must not be an existing winner or the one who forfeited
+                .filter(c => !existingWinnerIds.has(c.name))
                 .map(c => ({
                     ...c,
                     voteCount: voteCounts.get(c.id) || 0,
                 }));
 
 
-            // 5. Determine the new winner from the eligible pool
             if (eligibleCandidates.length > 0) {
               eligibleCandidates.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
               
@@ -341,18 +369,14 @@ export async function declareWinner(
               if (topVoteCount > 0) {
                 const runnersUp = eligibleCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
                 if (runnersUp.length === 1) {
-                  // A clear, eligible runner-up is found
                   positions[positionIndex].winnerCandidateId = runnersUp[0].id;
                 } else {
-                  // A tie for runner-up among eligible candidates, needs manual resolution again
                   positions[positionIndex].winnerCandidateId = null;
                 }
               } else {
-                 // No eligible runner up with any votes
                 positions[positionIndex].winnerCandidateId = null;
               }
             } else {
-               // No eligible candidates left after forfeiture and filtering existing winners
                positions[positionIndex].winnerCandidateId = null;
             }
 

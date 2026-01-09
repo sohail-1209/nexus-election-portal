@@ -246,16 +246,16 @@ export default function ManageElectionRoomPage() {
 
   const renderForm = () => {
     if (room.roomType === 'review') {
-      return <ReviewRoomForm initialData={room} />;
+      return <ReviewRoomForm initialData={room} panelId={room.panelId} />;
     }
-    return <ElectionRoomForm initialData={room} />;
+    return <ElectionRoomForm initialData={room} panelId={room.panelId} />;
   }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Button variant="outline" asChild>
-          <Link href="/admin/dashboard">
+          <Link href={`/admin/panels/${room.panelId}`}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
           </Link>
         </Button>

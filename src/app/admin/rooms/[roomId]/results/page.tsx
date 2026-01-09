@@ -169,14 +169,12 @@ export default function ElectionResultsPage() {
     if (!room || room.status !== 'closed' || room.roomType === 'review') {
       return { ties: [], multiWins: [], allConflictsResolved: true };
     }
-
-    const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
     
-    // Data structures for conflict detection
     const ties: { position: Position; candidates: Candidate[] }[] = [];
     const winsByCandidateName = new Map<string, { candidate: Candidate; positions: Position[] }>();
 
-    // 1. Iterate through each unresolved position to find winners and ties
+    const unresolvedPositions = room.positions.filter(p => !p.winnerCandidateId);
+
     for (const position of unresolvedPositions) {
       if (position.candidates.length === 0) continue;
 
@@ -186,28 +184,23 @@ export default function ElectionResultsPage() {
       if (topVoteCount > 0) {
         const currentWinners = sortedCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
         
-        // Add all winners to the central wins tracker, keyed by candidate NAME for uniqueness
-        for (const winner of currentWinners) {
-          const existing = winsByCandidateName.get(winner.name) || { candidate: winner, positions: [] };
-          // Avoid adding the same position twice if it's already there
-          if (!existing.positions.some(p => p.id === position.id)) {
-            existing.positions.push(position);
-          }
-          winsByCandidateName.set(winner.name, existing);
-        }
-
-        // Check for a tie within this specific position
         if (currentWinners.length > 1) {
           ties.push({ position, candidates: currentWinners });
+        }
+        
+        for (const winner of currentWinners) {
+          if (!winsByCandidateName.has(winner.name)) {
+            winsByCandidateName.set(winner.name, { candidate: winner, positions: [] });
+          }
+          winsByCandidateName.get(winner.name)!.positions.push(position);
         }
       }
     }
     
-    // 2. Determine multi-wins from the populated map
     const multiWins = Array.from(winsByCandidateName.values())
       .filter(data => data.positions.length > 1)
       .map(data => ({
-        candidateId: data.candidate.id, // We need one ID for resolution
+        candidateId: data.candidate.id,
         name: data.candidate.name,
         positions: data.positions,
       }));
@@ -501,8 +494,8 @@ export default function ElectionResultsPage() {
         </CardHeader>
         <CardContent className="text-center">
           <Button asChild>
-              <Link href={`/admin/rooms/${roomId}/manage`}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Manage
+              <Link href={room ? `/admin/panels/${room.panelId}` : '/admin/dashboard'}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
               </Link>
           </Button>
         </CardContent>
@@ -520,7 +513,7 @@ export default function ElectionResultsPage() {
       return 'Two or more candidates have the same number of votes. Please manually select one candidate as the official winner for this position.';
     }
     if (currentConflict.type === 'multi-win') {
-      return `Candidate ${currentConflict.name} has won in multiple positions. After consulting with them, please choose which position they will retain. The other position(s) will be automatically assigned to the runner-up.`;
+        return `Candidate ${currentConflict.name} has won in multiple positions. After consulting with them, please choose which position they will retain. The other position(s) will be automatically assigned to the runner-up if available.`;
     }
     return "";
   };
@@ -537,8 +530,8 @@ export default function ElectionResultsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <Button variant="outline" asChild className="mb-2 sm:mb-0 sm:mr-4">
-            <Link href={`/admin/rooms/${room.id}/manage`}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Manage Room
+            <Link href={`/admin/panels/${room.panelId}`}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
             </Link>
             </Button>
             <h1 className="text-3xl font-bold font-headline mt-2">Results: {room.title}</h1>
