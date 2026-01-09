@@ -2,37 +2,7 @@
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position, Candidate, ElectionPanel } from '@/lib/types';
-
-
-export async function getElectionPanels(): Promise<ElectionPanel[]> {
-    const panelsCol = collection(db, "electionPanels");
-    const q = query(panelsCol, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-            id: doc.id,
-            title: data.title || "Untitled Panel",
-            description: data.description || "No description",
-            createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-        }
-    });
-}
-
-export async function getPanelById(panelId: string): Promise<ElectionPanel | null> {
-    const panelRef = doc(db, "electionPanels", panelId);
-    const docSnap = await getDoc(panelRef);
-    if (!docSnap.exists()) return null;
-
-    const data = docSnap.data();
-    return {
-        id: docSnap.id,
-        title: data.title || "Untitled Panel",
-        description: data.description || "No description",
-        createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-    }
-}
+import type { ElectionRoom, Voter, Review, Position, Candidate } from '@/lib/types';
 
 
 export async function getElectionRooms(): Promise<ElectionRoom[]> {
@@ -54,7 +24,6 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
         createdAt: new Date().toISOString(),
         status: 'pending' as ElectionRoom['status'],
         roomType: 'voting',
-        panelId: 'unknown',
       };
     }
 
@@ -104,7 +73,6 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
       updatedAt: updatedAt,
       status: (data.status as ElectionRoom['status']) || 'pending',
       roomType: data.roomType || 'voting',
-      panelId: data.panelId || 'unknown',
     };
   });
 }
@@ -234,7 +202,6 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     updatedAt: updatedAt,
     status: (data.status as ElectionRoom['status']) || 'pending',
     roomType: data.roomType || 'voting',
-    panelId: data.panelId,
   };
 }
 
@@ -321,7 +288,8 @@ export async function declareWinner(
           throw new Error("Room not found.");
         }
         
-        let positions: Position[] = roomDoc.data().positions.map((p: any) => ({...p}));
+        const currentRoomData = roomDoc.data();
+        let positions: Position[] = JSON.parse(JSON.stringify(currentRoomData.positions));
 
         const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
         if (positionIndex === -1) {
@@ -329,11 +297,9 @@ export async function declareWinner(
         }
 
         if (winnerCandidateId === 'forfeited' && options.forfeitedByCandidateName) {
-            const currentRoomData = (await transaction.get(roomRef)).data();
-            if (!currentRoomData) throw new Error("Room data disappeared during transaction.");
             
             const existingWinnerIds = new Set<string>();
-            currentRoomData.positions.forEach((p: Position) => {
+            positions.forEach((p: Position) => {
                 if (p.winnerCandidateId && p.id !== positionId) {
                   const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
                   if (winner) existingWinnerIds.add(winner.id);

@@ -21,7 +21,7 @@ export default function CreateReviewRoomPage() {
           <CardDescription>A room for taking feedback/rating of the previous member of Club</CardDescription>
         </CardHeader>
         <CardContent>
-            <ReviewRoomForm panelId={null} />
+            <ReviewRoomForm />
         </CardContent>
       </Card>
     </div>

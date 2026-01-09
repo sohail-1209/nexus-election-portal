@@ -493,7 +493,7 @@ export default function ElectionResultsPage() {
         </CardHeader>
         <CardContent className="text-center">
           <Button asChild>
-              <Link href={room?.panelId ? `/admin/panels/${room.panelId}` : '/admin/dashboard'}>
+              <Link href={'/admin/dashboard'}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Link>
           </Button>
@@ -529,7 +529,7 @@ export default function ElectionResultsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <Button variant="outline" asChild className="mb-2 sm:mb-0 sm:mr-4">
-            <Link href={room.panelId ? `/admin/panels/${room.panelId}` : '/admin/dashboard'}>
+            <Link href={'/admin/dashboard'}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
             </Link>
             </Button>

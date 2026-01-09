@@ -246,9 +246,9 @@ export default function ManageElectionRoomPage() {
 
   const renderForm = () => {
     if (room.roomType === 'review') {
-      return <ReviewRoomForm initialData={room} panelId={room.panelId} />;
+      return <ReviewRoomForm initialData={room} />;
     }
-    return <ElectionRoomForm initialData={room} panelId={room.panelId} />;
+    return <ElectionRoomForm initialData={room} />;
   }
 
   return (

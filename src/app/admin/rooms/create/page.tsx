@@ -21,7 +21,7 @@ export default function CreateElectionRoomPage() {
           <CardDescription>Define the details for your new voting room.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ElectionRoomForm panelId={null} />
+          <ElectionRoomForm />
         </CardContent>
       </Card>
     </div>

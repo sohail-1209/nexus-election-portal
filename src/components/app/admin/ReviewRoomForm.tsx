@@ -59,12 +59,11 @@ type ReviewRoomFormValues = z.infer<typeof reviewRoomFormSchema>;
 
 interface ReviewRoomFormProps {
   initialData?: ElectionRoom;
-  panelId: string | null;
 }
 
 const generateClientSideId = (prefix: string = "item") => `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 
-export default function ReviewRoomForm({ initialData, panelId }: ReviewRoomFormProps) {
+export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -115,16 +114,6 @@ export default function ReviewRoomForm({ initialData, panelId }: ReviewRoomFormP
   async function onSubmit(values: ReviewRoomFormValues) {
     setIsLoading(true);
 
-    if (!panelId && !initialData?.panelId) {
-        toast({
-            variant: "destructive",
-            title: "Panel ID Missing",
-            description: "Could not create or update the room because the panel association is missing.",
-        });
-        setIsLoading(false);
-        return;
-    }
-
     const firestoreReadyPositions = values.positions.map(p => ({
         id: p.id || generateClientSideId('pos'),
         title: p.title,
@@ -142,7 +131,6 @@ export default function ReviewRoomForm({ initialData, panelId }: ReviewRoomFormP
       positions: firestoreReadyPositions,
       status: values.status || 'pending',
       roomType: 'review',
-      panelId: panelId || initialData?.panelId,
     };
     
     try {
@@ -168,7 +156,7 @@ export default function ReviewRoomForm({ initialData, panelId }: ReviewRoomFormP
           description: `"${values.title}" has been successfully created.`,
         });
       }
-      router.push(`/admin/panels/${dataToSave.panelId}`);
+      router.push(`/admin/dashboard`);
       router.refresh(); 
     } catch (error) {
       console.error("Error saving review room: ", error);

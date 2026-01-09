@@ -63,13 +63,12 @@ type ElectionRoomFormValues = z.infer<typeof electionRoomFormSchema>;
 
 interface ElectionRoomFormProps {
   initialData?: ElectionRoom;
-  panelId: string | null;
 }
 
 const generateClientSideId = (prefix: string = "item") => `${prefix}-${Math.random().toString(36).substr(2, 9)}`;
 
 
-export default function ElectionRoomForm({ initialData, panelId }: ElectionRoomFormProps) {
+export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -122,16 +121,6 @@ export default function ElectionRoomForm({ initialData, panelId }: ElectionRoomF
   async function onSubmit(values: ElectionRoomFormValues) {
     setIsLoading(true);
 
-    if (!panelId && !initialData?.panelId) {
-        toast({
-            variant: "destructive",
-            title: "Panel ID Missing",
-            description: "Could not create or update the room because the panel association is missing.",
-        });
-        setIsLoading(false);
-        return;
-    }
-
     const firestoreReadyPositions = values.positions.map(p => ({
         id: p.id || generateClientSideId('pos'),
         title: p.title,
@@ -150,7 +139,6 @@ export default function ElectionRoomForm({ initialData, panelId }: ElectionRoomF
       positions: firestoreReadyPositions,
       roomType: initialData?.roomType || 'voting',
       status: values.status || 'pending',
-      panelId: panelId || initialData?.panelId,
     };
     
     try {
@@ -176,7 +164,7 @@ export default function ElectionRoomForm({ initialData, panelId }: ElectionRoomF
           description: `"${values.title}" has been successfully created.`,
         });
       }
-      router.push(`/admin/panels/${dataToSave.panelId}`);
+      router.push(`/admin/dashboard`);
       router.refresh(); 
     } catch (error) {
       console.error("Error saving voting room: ", error);
