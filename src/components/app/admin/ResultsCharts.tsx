@@ -24,15 +24,16 @@ const CHART_COLORS = [
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
+  "hsl(var(--muted))", // Color for abstained votes
 ];
 
 const RADIAN = Math.PI / 180;
-const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }: any) => {
+  if (percent * 100 < 5 || name === "Abstained") return null; // Don't render label if slice is too small or for abstained
+
   const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
   const x = cx + radius * Math.cos(-midAngle * RADIAN);
   const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  if (percent * 100 < 5) return null; // Don't render label if slice is too small
 
   return (
     <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
@@ -44,15 +45,29 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 
 export default function ResultsCharts({ positions, totalCompletedVoters }: ResultsChartsProps) {
   const chartDataByPosition = useMemo(() => {
-    return positions.map(position => ({
-      positionTitle: position.title,
+    return positions.map(position => {
+      const votesForPosition = position.candidates.reduce((sum, cand) => sum + (cand.voteCount || 0), 0);
+      const abstainedVotes = totalCompletedVoters - votesForPosition;
+
       // The name/value structure is required for pie charts
-      candidatesData: position.candidates.map((candidate, index) => ({
+      const candidatesData = position.candidates.map((candidate, index) => ({
         name: candidate.name,
         value: candidate.voteCount || 0,
-      })).filter(c => c.value > 0), // Only include candidates with votes
-    }));
-  }, [positions]);
+      })).filter(c => c.value > 0); // Only include candidates with votes
+
+      if (abstainedVotes > 0) {
+        candidatesData.push({
+          name: "Abstained",
+          value: abstainedVotes,
+        });
+      }
+
+      return {
+        positionTitle: position.title,
+        candidatesData,
+      };
+    });
+  }, [positions, totalCompletedVoters]);
 
   if (!positions || positions.length === 0) {
     return <p className="text-muted-foreground text-center py-8">No positions or results to display charts for.</p>;
@@ -61,18 +76,18 @@ export default function ResultsCharts({ positions, totalCompletedVoters }: Resul
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {chartDataByPosition.map(({ positionTitle, candidatesData }) => {
-        const positionTotalVotes = candidatesData.reduce((sum, entry) => sum + entry.value, 0);
+        const hasVotes = candidatesData.some(d => d.name !== 'Abstained');
         
         return (
           <Card key={positionTitle} className="shadow-lg">
             <CardHeader>
               <CardTitle className="text-xl font-headline">{positionTitle} - Vote Distribution</CardTitle>
               <CardDescription>
-                A visual representation of votes for each candidate in this position. Total votes cast in room: {totalCompletedVoters}.
+                A visual representation of votes for each candidate in this position, out of {totalCompletedVoters} total participant(s).
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {candidatesData.length > 0 ? (
+              {candidatesData.length > 0 && hasVotes ? (
                 <ResponsiveContainer width="100%" height={350}>
                   <PieChart>
                     <Tooltip
@@ -104,7 +119,7 @@ export default function ResultsCharts({ positions, totalCompletedVoters }: Resul
                       label={renderCustomizedLabel}
                     >
                       {candidatesData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        <Cell key={`cell-${index}`} fill={entry.name === 'Abstained' ? "hsl(var(--muted))" : CHART_COLORS[index % (CHART_COLORS.length - 1)]} />
                       ))}
                     </Pie>
                   </PieChart>
