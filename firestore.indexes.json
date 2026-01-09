@@ -6,34 +6,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "panelId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "electionRooms",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "panelId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "electionRooms",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
         }

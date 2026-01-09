@@ -35,9 +35,9 @@ export async function getPanelById(panelId: string): Promise<ElectionPanel | nul
 }
 
 
-export async function getElectionRooms(panelId: string): Promise<ElectionRoom[]> {
+export async function getElectionRooms(): Promise<ElectionRoom[]> {
   const electionRoomsCol = collection(db, "electionRooms");
-  const q = query(electionRoomsCol, where("panelId", "==", panelId), orderBy("createdAt", "desc"));
+  const q = query(electionRoomsCol, orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
   
   return snapshot.docs.map(doc => {
@@ -54,7 +54,7 @@ export async function getElectionRooms(panelId: string): Promise<ElectionRoom[]>
         createdAt: new Date().toISOString(),
         status: 'pending' as ElectionRoom['status'],
         roomType: 'voting',
-        panelId: panelId,
+        panelId: 'unknown',
       };
     }
 
@@ -104,7 +104,7 @@ export async function getElectionRooms(panelId: string): Promise<ElectionRoom[]>
       updatedAt: updatedAt,
       status: (data.status as ElectionRoom['status']) || 'pending',
       roomType: data.roomType || 'voting',
-      panelId: data.panelId,
+      panelId: data.panelId || 'unknown',
     };
   });
 }
@@ -321,58 +321,50 @@ export async function declareWinner(
           throw new Error("Room not found.");
         }
         
-        const roomData = roomDoc.data();
-        let positions: Position[] = roomData.positions.map((p: any) => ({...p}));
+        let positions: Position[] = roomDoc.data().positions.map((p: any) => ({...p}));
 
         const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
         if (positionIndex === -1) {
           throw new Error("Position not found.");
         }
 
-        if (winnerCandidateId === 'forfeited') {
-            const currentPositionsState: Position[] = (await transaction.get(roomRef)).data()?.positions || [];
+        if (winnerCandidateId === 'forfeited' && options.forfeitedByCandidateName) {
+            const currentRoomData = (await transaction.get(roomRef)).data();
+            if (!currentRoomData) throw new Error("Room data disappeared during transaction.");
             
             const existingWinnerIds = new Set<string>();
-            currentPositionsState.forEach(p => {
-              if (p.winnerCandidateId && p.id !== positionId) { // Exclude the current position being forfeited
-                const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
-                if(winner) existingWinnerIds.add(winner.name);
-              }
+            currentRoomData.positions.forEach((p: Position) => {
+                if (p.winnerCandidateId && p.id !== positionId) {
+                  const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
+                  if (winner) existingWinnerIds.add(winner.id);
+                }
             });
 
             const candidatesInForfeitedPosition: Candidate[] = positions[positionIndex].candidates;
-            const forfeitingCandidate = candidatesInForfeitedPosition.find(c => c.name === options.forfeitedByCandidateName);
-            if(forfeitingCandidate) {
-              existingWinnerIds.add(forfeitingCandidate.name);
-            }
-
+            
             const votesSnap = await getDocs(query(collection(db, "electionRooms", roomId, "votes"), where("positionId", "==", positionId)));
             const voteCounts = new Map<string, number>();
             votesSnap.forEach(voteDoc => {
                 const candId = voteDoc.data().candidateId;
                 voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
             });
-            
+
+            const forfeitingCandidate = candidatesInForfeitedPosition.find(c => c.name === options.forfeitedByCandidateName);
+
             const eligibleCandidates = candidatesInForfeitedPosition
-                .filter(c => !existingWinnerIds.has(c.name))
+                .filter(c => c.id !== forfeitingCandidate?.id && !existingWinnerIds.has(c.id))
                 .map(c => ({
                     ...c,
                     voteCount: voteCounts.get(c.id) || 0,
                 }));
 
-
             if (eligibleCandidates.length > 0) {
               eligibleCandidates.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
-              
               const topVoteCount = eligibleCandidates[0]?.voteCount || 0;
 
               if (topVoteCount > 0) {
                 const runnersUp = eligibleCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-                if (runnersUp.length === 1) {
-                  positions[positionIndex].winnerCandidateId = runnersUp[0].id;
-                } else {
-                  positions[positionIndex].winnerCandidateId = null;
-                }
+                positions[positionIndex].winnerCandidateId = runnersUp.length === 1 ? runnersUp[0].id : null;
               } else {
                 positions[positionIndex].winnerCandidateId = null;
               }

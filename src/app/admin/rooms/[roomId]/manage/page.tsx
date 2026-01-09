@@ -255,8 +255,8 @@ export default function ManageElectionRoomPage() {
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Button variant="outline" asChild>
-          <Link href={`/admin/panels/${room.panelId}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
+          <Link href="/admin/dashboard">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
           </Link>
         </Button>
         <Button variant="default" asChild>
@@ -322,5 +322,3 @@ export default function ManageElectionRoomPage() {
     </div>
   );
 }
-
-    
