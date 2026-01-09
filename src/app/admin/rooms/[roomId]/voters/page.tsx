@@ -107,7 +107,7 @@ export default function VoterListPage() {
         <div className="max-w-4xl mx-auto space-y-6">
             <Button variant="outline" asChild>
                 <Link href={`/admin/dashboard`}>
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
                 </Link>
             </Button>
             <VoterListSkeleton />
@@ -120,7 +120,7 @@ export default function VoterListPage() {
         <div className="max-w-4xl mx-auto space-y-6">
             <Button variant="outline" asChild>
                 <Link href={`/admin/dashboard`}>
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Panel
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
                 </Link>
             </Button>
             <Card className="shadow-xl border-destructive">
@@ -212,5 +212,3 @@ export default function VoterListPage() {
     </div>
   );
 }
-
-    

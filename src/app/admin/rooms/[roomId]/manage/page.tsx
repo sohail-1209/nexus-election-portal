@@ -10,7 +10,7 @@ import type { ElectionRoom, Voter } from "@/lib/types";
 
 import ElectionRoomForm from '@/components/app/admin/ElectionRoomForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, BarChart3, AlertTriangle, Fingerprint, Users, Activity, CheckCircle, LogIn, Loader2 } from 'lucide-react';
+import { ArrowLeft, BarChart3, AlertTriangle, Fingerprint, Users, Activity, CheckCircle, LogIn, Loader2, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -21,6 +21,14 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReviewRoomForm from "@/components/app/admin/ReviewRoomForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 
 function LiveStatusSkeleton() {
@@ -46,9 +54,9 @@ function LiveStatusSkeleton() {
                         <TableBody>
                             {[...Array(2)].map((_, i) => (
                                 <TableRow key={i}>
-                                    <TableCell><Skeleton className="h-5 w-[200px]" /></TableCell>
+                                    <TableCell><Skeleton className="h-5 w-[100px]" /></TableCell>
                                     <TableCell><Skeleton className="h-6 w-[100px]" /></TableCell>
-                                    <TableCell className="text-right"><Skeleton className="h-5 w-[150px] ml-auto" /></TableCell>
+                                    <TableCell className="text-right"><Skeleton className="h-5 w-[100px] ml-auto" /></TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
@@ -101,14 +109,14 @@ function LiveStatusDisplay({ room }: { room: ElectionRoom }) {
                     Live Participation Status
                 </CardTitle>
                 <CardDescription>
-                    Real-time tracking of participants in this room. A total of {participants.length} {participants.length === 1 ? 'person has' : 'people have'} entered.
+                    {participants.length} {participants.length === 1 ? 'person has' : 'people have'} entered.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 {participants.length > 0 ? (
-                    <div className="border rounded-lg max-h-96 overflow-y-auto">
+                    <div className="border rounded-lg max-h-80 overflow-y-auto">
                         <Table>
-                            <TableHeader className="sticky top-0 bg-muted/90 backdrop-blur-sm">
+                            <TableHeader className="sticky top-0 bg-muted/90 backdrop-blur-sm z-10">
                                 <TableRow>
                                     <TableHead>{title}</TableHead>
                                     <TableHead>Status</TableHead>
@@ -119,24 +127,24 @@ function LiveStatusDisplay({ room }: { room: ElectionRoom }) {
                                 {participants.map((p) => (
                                     <TableRow key={p.email}>
                                         <TableCell className="font-medium">
-                                            <div className="truncate max-w-xs">{p.email}</div>
+                                            <div className="truncate max-w-[120px] sm:max-w-xs">{p.email}</div>
                                             {p.ownPositionTitle && (
-                                                <div className="text-xs text-muted-foreground">{p.ownPositionTitle}</div>
+                                                <div className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-xs">{p.ownPositionTitle}</div>
                                             )}
                                         </TableCell>
                                         <TableCell>
                                             {p.status === 'completed' ? (
                                                 <Badge variant="default" className="bg-green-600 hover:bg-green-700">
-                                                    <CheckCircle className="mr-1 h-3 w-3" /> Completed
+                                                    <CheckCircle className="mr-1 h-3 w-3" /> Done
                                                 </Badge>
                                             ) : (
                                                 <Badge variant="secondary">
-                                                    <LogIn className="mr-1 h-3 w-3" /> In Room
+                                                    <LogIn className="mr-1 h-3 w-3" /> In
                                                 </Badge>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right">
-                                            {p.lastActivity ? format(new Date(p.lastActivity), "PPP p") : 'N/A'}
+                                        <TableCell className="text-right text-xs">
+                                            {p.lastActivity ? format(new Date(p.lastActivity), "PP p") : 'N/A'}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -165,7 +173,6 @@ export default function ManageElectionRoomPage() {
   const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
-    // Set base URL only on the client side
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin);
     }
@@ -204,17 +211,28 @@ export default function ManageElectionRoomPage() {
 
   if (loading) {
      return (
-      <div className="max-w-4xl mx-auto space-y-6">
-        <Skeleton className="h-10 w-48" /> {/* Back button */}
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-3/4 mb-2" /> {/* Title */}
-            <Skeleton className="h-4 w-1/2" /> {/* Description */}
-          </CardHeader>
-          <CardContent className="flex items-center justify-center h-64">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          </CardContent>
-        </Card>
+      <div className="max-w-7xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-48" /> 
+        <div className="flex flex-col lg:flex-row gap-6">
+          <div className="lg:w-3/5">
+             <Card>
+                <CardHeader>
+                  <Skeleton className="h-8 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-1/2" /> 
+                </CardHeader>
+                <CardContent className="flex items-center justify-center h-96">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                </CardContent>
+              </Card>
+          </div>
+          <div className="lg:w-2/5 space-y-6">
+            <LiveStatusSkeleton />
+            <Card>
+              <CardHeader><Skeleton className="h-7 w-1/2" /></CardHeader>
+              <CardContent><Skeleton className="h-10 w-1/2" /></CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -252,73 +270,89 @@ export default function ManageElectionRoomPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <Button variant="outline" asChild>
           <Link href="/admin/dashboard">
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
           </Link>
         </Button>
-        <Button variant="default" asChild>
-          <Link href={`/admin/rooms/${room.id}/results`}>
-            <BarChart3 className="mr-2 h-4 w-4" /> View Results
-          </Link>
-        </Button>
-      </div>
-      
-      <Card className="shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline">Manage: {room.title}</CardTitle>
-          <CardDescription>Edit details, positions, candidates, and manage access for this {room.roomType} room.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {renderForm()}
-        </CardContent>
-      </Card>
-
-      <LiveStatusDisplay room={room} />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl font-headline">Access & Sharing</CardTitle>
-          <CardDescription>
-            Share this room with voters. For the link to work correctly when your app is deployed,
-            ensure your <code className="font-mono bg-muted px-1 rounded">NEXT_PUBLIC_BASE_URL</code> environment variable is set to your app's public URL.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-           <Alert variant="default">
-            <Fingerprint className="h-4 w-4" />
-            <AlertTitle>Your Room ID</AlertTitle>
-            <AlertDescription>
-              Voters can use this ID to manually access the room from the main <Link href="/vote" className="underline font-semibold">voting page</Link>.
-              <div className="mt-2">
-                <code className="text-sm bg-muted px-2 py-1 rounded font-mono break-all">
-                  {room.id}
-                </code>
+        <div className="flex items-center gap-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Share2 className="mr-2 h-4 w-4" /> Share
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Access & Sharing</DialogTitle>
+                <DialogDescription>
+                  Share this room with participants. For the link to work correctly when your app is deployed,
+                  ensure your environment variable is set to your app's public URL.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <Alert variant="default">
+                  <Fingerprint className="h-4 w-4" />
+                  <AlertTitle>Your Room ID</AlertTitle>
+                  <AlertDescription>
+                    Participants can use this ID to manually access the room from the main <Link href="/vote" className="underline font-semibold">entry page</Link>.
+                    <div className="mt-2">
+                      <code className="text-sm bg-muted px-2 py-1 rounded font-mono break-all">
+                        {room.id}
+                      </code>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+                <ShareableLinkDisplay voterLink={voterLink} />
               </div>
-            </AlertDescription>
-          </Alert>
-          <ShareableLinkDisplay voterLink={voterLink} />
-        </CardContent>
-      </Card>
+            </DialogContent>
+          </Dialog>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl font-headline">Voter Participation</CardTitle>
-          <CardDescription>
-            View the list of emails for everyone who has cast a ballot in this election.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href={`/admin/rooms/${room.id}/voters`}>
-              <Users className="mr-2 h-4 w-4" /> View Voter List
+          <Button variant="default" asChild>
+            <Link href={`/admin/rooms/${room.id}/results`}>
+              <BarChart3 className="mr-2 h-4 w-4" /> View Results
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+      
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        {/* Left Column */}
+        <div className="w-full lg:w-3/5 space-y-6">
+            <Card className="shadow-xl">
+                <CardHeader>
+                <CardTitle className="text-3xl font-headline">Manage: {room.title}</CardTitle>
+                <CardDescription>Edit details, positions, candidates, and manage access for this {room.roomType} room.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                {renderForm()}
+                </CardContent>
+            </Card>
+        </div>
 
+        {/* Right Column */}
+        <div className="w-full lg:w-2/5 space-y-6 sticky top-20">
+            <LiveStatusDisplay room={room} />
+
+            <Card>
+                <CardHeader>
+                <CardTitle className="text-xl font-headline">Voter Participation</CardTitle>
+                <CardDescription>
+                    View the list of all participants who have completed their submission.
+                </CardDescription>
+                </CardHeader>
+                <CardContent>
+                <Button asChild>
+                    <Link href={`/admin/rooms/${room.id}/voters`}>
+                    <Users className="mr-2 h-4 w-4" /> View Participant List
+                    </Link>
+                </Button>
+                </CardContent>
+            </Card>
+        </div>
+      </div>
     </div>
   );
 }
