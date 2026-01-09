@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -47,7 +46,7 @@ export default function ReviewResultsDisplay({ room }: ReviewResultsDisplayProps
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex justify-end items-center mb-4">
+                    <div className="flex justify-start items-center mb-4">
                         {totalReviews > 0 && (
                             <Button variant="outline" size="sm" onClick={() => toggleFeedbackVisibility(position.id)}>
                                 {isFeedbackVisible ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
