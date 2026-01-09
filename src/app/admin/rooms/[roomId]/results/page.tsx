@@ -11,14 +11,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useNotificationStore } from "@/stores/notificationStore";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, Code, File, FileText, BadgeHelp, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, File, FileText, BadgeHelp, CheckCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
 import ResultsCharts from "@/components/app/admin/ResultsCharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ResultsLoading from "./loading";
-import Image from "next/image";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
@@ -761,3 +760,5 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
