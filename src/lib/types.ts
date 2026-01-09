@@ -35,7 +35,6 @@ export interface ElectionRoom {
   updatedAt?: string; // Added for Firestore timestamp
   status: 'pending' | 'active' | 'closed';
   roomType?: 'voting' | 'review';
-  groupId?: string; // Added for grouping
 }
 
 export interface Voter {
@@ -44,11 +43,4 @@ export interface Voter {
   lastActivity?: string;
   votedAt?: string;
   ownPositionTitle?: string;
-}
-
-export interface ElectionGroup {
-  id: string;
-  name: string;
-  createdAt: string;
-  roomIds: string[];
 }
