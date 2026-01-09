@@ -10,16 +10,15 @@ import {
 } from "@/components/ui/table";
 import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, Award } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ResultsTableProps {
   positions: Position[];
   totalCompletedVoters: number;
-  isConflictInPosition: (positionId: string) => boolean;
 }
 
-export default function ResultsTable({ positions, totalCompletedVoters, isConflictInPosition }: ResultsTableProps) {
+export default function ResultsTable({ positions, totalCompletedVoters }: ResultsTableProps) {
   if (!positions || positions.length === 0) {
     return <p className="text-muted-foreground text-center py-8">No positions or results to display.</p>;
   }
@@ -29,11 +28,10 @@ export default function ResultsTable({ positions, totalCompletedVoters, isConfli
       {positions.map((position) => {
         const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
-        const hasConflict = isConflictInPosition(position.id);
         
         return (
-          <div key={position.id} className={cn("border rounded-lg shadow-sm", hasConflict && "bg-rose-500/5 border-rose-500/50")}>
-            <h3 className={cn("text-xl font-semibold mb-3 font-headline p-4 border-b", hasConflict && "text-rose-900 dark:text-rose-200")}>{position.title}</h3>
+          <div key={position.id} className="border rounded-lg shadow-sm">
+            <h3 className="text-xl font-semibold mb-3 font-headline p-4 border-b">{position.title}</h3>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -47,18 +45,14 @@ export default function ResultsTable({ positions, totalCompletedVoters, isConfli
               <TableBody>
                 {sortedCandidates.map((candidate, index) => {
                   const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
-                  const isWinnerByVotes = (candidate.voteCount || 0) === maxVotes && maxVotes > 0;
+                  const isWinnerByVotes = maxVotes > 0 && (candidate.voteCount || 0) === maxVotes;
                   
                   return (
-                    <TableRow key={candidate.id} className={candidate.isOfficialWinner ? "bg-green-600/10" : ""}>
+                    <TableRow key={candidate.id} className={cn(isWinnerByVotes && "bg-green-600/10")}>
                       <TableCell className="font-medium text-center">
-                        {candidate.isOfficialWinner ? (
-                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
-                                <Award className="h-3 w-3 mr-1" /> Official Winner
-                            </Badge>
-                        ) : isWinnerByVotes && !hasConflict ? (
+                        {isWinnerByVotes ? (
                             <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white">
-                                <Trophy className="h-3 w-3 mr-1" /> {index + 1}
+                                <Trophy className="h-3 w-3 mr-1" /> Winner
                             </Badge>
                         ) : (
                             index + 1

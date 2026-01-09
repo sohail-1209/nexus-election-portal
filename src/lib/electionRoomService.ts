@@ -49,7 +49,6 @@ export async function getElectionRooms(): Promise<ElectionRoom[]> {
           return {
             id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
             title: p?.title || "Untitled Position",
-            winnerCandidateId: p?.winnerCandidateId || null,
             candidates: Array.isArray(candidatesRaw)
               ? candidatesRaw.map((c: any) => ({
                   id: c?.id || `cand-${Math.random().toString(36).substr(2, 9)}`,
@@ -92,7 +91,6 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
   let finalPositions: Position[] = (data.positions || []).map((p: any) => ({
     id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
     title: p?.title || "Untitled Position",
-    winnerCandidateId: p?.winnerCandidateId || null,
     candidates: (p?.candidates || []).map((c: any) => ({
       id: c?.id || `cand-${Math.random().toString(36).substr(2, 9)}`,
       name: c?.name || "Unnamed Candidate",
@@ -156,13 +154,6 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
         const candidateId = voteData.candidateId;
         voteCounts.set(candidateId, (voteCounts.get(candidateId) || 0) + 1);
       });
-
-      const officialWinnersByPosition = new Map<string, string>();
-      finalPositions.forEach(p => {
-        if(p.winnerCandidateId) {
-          officialWinnersByPosition.set(p.id, p.winnerCandidateId);
-        }
-      });
       
       finalPositions = finalPositions.map(position => ({
         ...position,
@@ -170,7 +161,6 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
           ...candidate,
           voteCount: voteCounts.get(candidate.id) || 0,
           positionTitle: position.title, // Add position title to candidate
-          isOfficialWinner: officialWinnersByPosition.get(position.id) === candidate.id,
         })),
       }));
     }
@@ -262,103 +252,6 @@ export async function deleteElectionRoom(roomId: string, adminPassword: string):
         }
         return { success: false, message: "An unexpected error occurred while deleting the room." };
     }
-}
-
-export async function declareWinner(
-    roomId: string, 
-    positionId: string, 
-    winnerCandidateId: string,
-    adminPassword: string,
-    options: { forfeitedByCandidateName?: string } = {}
-): Promise<{ success: boolean, message: string }> {
-  const roomRef = doc(db, "electionRooms", roomId);
-  const user = auth.currentUser;
-
-  if (!user || !user.email) {
-      throw new Error("No authenticated user found. Please log in again.");
-  }
-  
-  try {
-      const credential = EmailAuthProvider.credential(user.email, adminPassword);
-      await reauthenticateWithCredential(user, credential);
-      
-      await runTransaction(db, async (transaction) => {
-        const roomDoc = await transaction.get(roomRef);
-        if (!roomDoc.exists()) {
-          throw new Error("Room not found.");
-        }
-        
-        const currentRoomData = roomDoc.data();
-        let positions: Position[] = JSON.parse(JSON.stringify(currentRoomData.positions));
-
-        const positionIndex = positions.findIndex((p: Position) => p.id === positionId);
-        if (positionIndex === -1) {
-          throw new Error("Position not found.");
-        }
-
-        if (winnerCandidateId === 'forfeited' && options.forfeitedByCandidateName) {
-            
-            const existingWinnerIds = new Set<string>();
-            positions.forEach((p: Position) => {
-                if (p.winnerCandidateId && p.id !== positionId) {
-                  const winner = p.candidates.find(c => c.id === p.winnerCandidateId);
-                  if (winner) existingWinnerIds.add(winner.id);
-                }
-            });
-
-            const candidatesInForfeitedPosition: Candidate[] = positions[positionIndex].candidates;
-            
-            const votesSnap = await getDocs(query(collection(db, "electionRooms", roomId, "votes"), where("positionId", "==", positionId)));
-            const voteCounts = new Map<string, number>();
-            votesSnap.forEach(voteDoc => {
-                const candId = voteDoc.data().candidateId;
-                voteCounts.set(candId, (voteCounts.get(candId) || 0) + 1);
-            });
-
-            const forfeitingCandidate = candidatesInForfeitedPosition.find(c => c.name === options.forfeitedByCandidateName);
-
-            const eligibleCandidates = candidatesInForfeitedPosition
-                .filter(c => c.id !== forfeitingCandidate?.id && !existingWinnerIds.has(c.id))
-                .map(c => ({
-                    ...c,
-                    voteCount: voteCounts.get(c.id) || 0,
-                }));
-
-            if (eligibleCandidates.length > 0) {
-              eligibleCandidates.sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
-              const topVoteCount = eligibleCandidates[0]?.voteCount || 0;
-
-              if (topVoteCount > 0) {
-                const runnersUp = eligibleCandidates.filter(c => (c.voteCount || 0) === topVoteCount);
-                positions[positionIndex].winnerCandidateId = runnersUp.length === 1 ? runnersUp[0].id : null;
-              } else {
-                positions[positionIndex].winnerCandidateId = null;
-              }
-            } else {
-               positions[positionIndex].winnerCandidateId = null;
-            }
-
-        } else {
-            const candidateExists = positions[positionIndex].candidates.some((c: Candidate) => c.id === winnerCandidateId);
-            if(!candidateExists) {
-              throw new Error("Selected winner does not exist in this position.");
-            }
-            positions[positionIndex].winnerCandidateId = winnerCandidateId;
-        }
-
-        transaction.update(roomRef, { positions });
-      });
-      return { success: true, message: "Winner declared successfully." };
-  } catch (error: any) {
-    console.error("Error declaring winner:", error);
-     if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        throw new Error("Incorrect password provided. Resolution failed.");
-    }
-    if (error.code === 'auth/requires-recent-login') {
-        throw new Error("This action requires a recent login. Please log out and log back in.");
-    }
-    throw new Error(error.message || "Failed to declare winner.");
-  }
 }
 
 export async function recordParticipantEntry(
