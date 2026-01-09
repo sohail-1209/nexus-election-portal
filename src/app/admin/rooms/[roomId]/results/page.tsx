@@ -485,7 +485,7 @@ export default function ElectionResultsPage() {
             <TabsTrigger value="table" className="text-sm md:text-base"><BarChartHorizontalBig className="mr-2 h-4 w-4"/>Table View</TabsTrigger>
           </TabsList>
           <TabsContent value="charts" className="space-y-8">
-            <ResultsCharts positions={room.positions} />
+            <ResultsCharts positions={room.positions} totalCompletedVoters={totalCompletedVoters} />
           </TabsContent>
           <TabsContent value="table" className="space-y-8">
               <Card>

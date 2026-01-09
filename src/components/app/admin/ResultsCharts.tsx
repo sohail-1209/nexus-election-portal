@@ -15,6 +15,7 @@ import { useMemo } from "react";
 
 interface ResultsChartsProps {
   positions: Position[];
+  totalCompletedVoters: number;
 }
 
 const CHART_COLORS = [
@@ -23,9 +24,6 @@ const CHART_COLORS = [
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
-  "hsl(174 100% 20%)",
-  "hsl(174 100% 28%)",
-  "hsl(174 100% 32%)",
 ];
 
 const RADIAN = Math.PI / 180;
@@ -44,7 +42,7 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, per
 };
 
 
-export default function ResultsCharts({ positions }: ResultsChartsProps) {
+export default function ResultsCharts({ positions, totalCompletedVoters }: ResultsChartsProps) {
   const chartDataByPosition = useMemo(() => {
     return positions.map(position => ({
       positionTitle: position.title,
@@ -63,14 +61,14 @@ export default function ResultsCharts({ positions }: ResultsChartsProps) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {chartDataByPosition.map(({ positionTitle, candidatesData }) => {
-        const totalVotes = candidatesData.reduce((sum, entry) => sum + entry.value, 0);
+        const positionTotalVotes = candidatesData.reduce((sum, entry) => sum + entry.value, 0);
         
         return (
           <Card key={positionTitle} className="shadow-lg">
             <CardHeader>
               <CardTitle className="text-xl font-headline">{positionTitle} - Vote Distribution</CardTitle>
               <CardDescription>
-                A visual representation of votes for each candidate in this position. Total votes: {totalVotes}.
+                A visual representation of votes for each candidate in this position. Total votes cast in room: {totalCompletedVoters}.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -85,7 +83,7 @@ export default function ResultsCharts({ positions }: ResultsChartsProps) {
                         borderRadius: 'var(--radius)',
                         color: 'hsl(var(--foreground))'
                       }}
-                      formatter={(value: number, name: string) => [`${value} vote(s)`, name]}
+                      formatter={(value: number, name: string) => [`${value} vote(s) out of ${totalCompletedVoters}`, name]}
                     />
                     <Legend 
                       iconSize={10} 
