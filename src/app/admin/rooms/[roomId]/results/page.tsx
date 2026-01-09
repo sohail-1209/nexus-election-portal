@@ -15,12 +15,9 @@ import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Load
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
-import ResultsCharts from "@/components/app/admin/ResultsCharts";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ResultsLoading from "./loading";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
-import ReviewCharts from "@/components/app/admin/ReviewCharts";
 import StarRating from "@/components/app/StarRating";
 import {
   AlertDialog,
@@ -385,6 +382,33 @@ export default function ElectionResultsPage() {
     return isInTie || isInMultiWin;
   }
 
+  const renderResults = () => {
+    if (room.roomType === 'review') {
+        return (
+            <div className="space-y-8">
+                <ReviewResultsDisplay room={room} />
+                <ReviewLeaderboard positions={room.positions} />
+            </div>
+        )
+    }
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Detailed Results</CardTitle>
+                <CardDescription>
+                Comprehensive breakdown of votes for each candidate. 
+                Vote counts and percentages are based on the {totalCompletedVoters} participant(s) who completed the process.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ResultsTable positions={room.positions} totalCompletedVoters={totalCompletedVoters} isConflictInPosition={isConflictInPosition} />
+            </CardContent>
+        </Card>
+    )
+  }
+
+
   return (
     <>
     <div className="space-y-8">
@@ -463,46 +487,9 @@ export default function ElectionResultsPage() {
             </CardHeader>
         </Card>
       )}
+      
+      {renderResults()}
 
-      {room.roomType === 'review' ? (
-         <Tabs defaultValue="charts" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-flex mb-4">
-              <TabsTrigger value="charts" className="text-sm md:text-base"><PieChart className="mr-2 h-4 w-4"/>Charts View</TabsTrigger>
-              <TabsTrigger value="feedback" className="text-sm md:text-base"><MessageSquare className="mr-2 h-4 w-4"/>Feedback View</TabsTrigger>
-            </TabsList>
-            <TabsContent value="charts" className="space-y-8">
-                <ReviewCharts positions={room.positions} />
-                <ReviewLeaderboard positions={room.positions} />
-            </TabsContent>
-            <TabsContent value="feedback">
-                <ReviewResultsDisplay room={room} />
-            </TabsContent>
-        </Tabs>
-      ) : (
-        <Tabs defaultValue="charts" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-flex mb-4">
-            <TabsTrigger value="charts" className="text-sm md:text-base"><BarChartHorizontalBig className="mr-2 h-4 w-4"/>Charts View</TabsTrigger>
-            <TabsTrigger value="table" className="text-sm md:text-base"><BarChartHorizontalBig className="mr-2 h-4 w-4"/>Table View</TabsTrigger>
-          </TabsList>
-          <TabsContent value="charts" className="space-y-8">
-            <ResultsCharts positions={room.positions} totalCompletedVoters={totalCompletedVoters} />
-          </TabsContent>
-          <TabsContent value="table" className="space-y-8">
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Detailed Results Table</CardTitle>
-                      <CardDescription>
-                        Comprehensive breakdown of votes for each candidate. 
-                        Vote counts and percentages are based on the {totalCompletedVoters} participant(s) who completed the process.
-                      </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                      <ResultsTable positions={room.positions} totalCompletedVoters={totalCompletedVoters} isConflictInPosition={isConflictInPosition} />
-                  </CardContent>
-              </Card>
-          </TabsContent>
-        </Tabs>
-      )}
     </div>
 
     {/* Conflict Resolution Dialog - Step 1: Select Resolution */}
@@ -595,5 +582,3 @@ export default function ElectionResultsPage() {
     </>
   );
 }
-
-    
