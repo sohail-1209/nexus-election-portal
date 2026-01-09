@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNotificationStore } from "@/stores/notificationStore";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, File, FileText, BadgeHelp, CheckCircle, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Download, BarChartHorizontalBig, AlertTriangle, Trophy, Loader2, MessageSquare, PieChart, FileText, BadgeHelp, CheckCircle, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -19,19 +19,9 @@ import ResultsCharts from "@/components/app/admin/ResultsCharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ResultsLoading from "./loading";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { jsPDF } from "jspdf";
-import autoTable from 'jspdf-autotable';
-import ResultsPdfLayout from "@/components/app/admin/ResultsPdfLayout";
 import ReviewResultsDisplay from "@/components/app/admin/ReviewResultsDisplay";
 import ReviewCharts from "@/components/app/admin/ReviewCharts";
 import StarRating from "@/components/app/StarRating";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -348,134 +338,6 @@ export default function ElectionResultsPage() {
     setIsExporting(false);
   };
 
-  const handleExportPdf = async () => {
-    if (!room) return;
-    setIsExporting(true);
-
-    const doc = new jsPDF();
-    const title = `${room.title} - Results`;
-    const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-
-    doc.setProperties({ title: title });
-
-    autoTable(doc, {
-        body: [
-            [{ content: room.title, styles: { fontSize: 18, fontStyle: 'bold', halign: 'center' } }],
-            [{ content: room.description, styles: { fontSize: 12, halign: 'center' } }],
-            [{ content: `Generated on: ${new Date().toLocaleString()}`, styles: { fontSize: 9, textColor: '#777', halign: 'center' } }],
-        ],
-        theme: 'plain',
-        styles: {
-            cellPadding: { top: 1, right: 0, bottom: 1, left: 0 },
-            font: 'times',
-        }
-    });
-
-    if (room.roomType === 'review') {
-        room.positions.forEach((position, index) => {
-            const startY = (doc as any).lastAutoTable.finalY + (index === 0 ? 15 : 20);
-
-            autoTable(doc, {
-                body: [
-                    [{ content: `Review for: ${position.title} - ${position.candidates[0]?.name || ''}`, styles: { fontSize: 16, fontStyle: 'bold' } }],
-                    [{ content: `Average Rating: ${position.averageRating?.toFixed(2) || 'N/A'} ★  |  Total Reviews: ${position.reviews?.length || 0}`, styles: { fontSize: 12 } }],
-                ],
-                theme: 'plain',
-                styles: { font: 'times', cellPadding: { top: 0, right: 0, bottom: 0, left: 0 } },
-                startY: startY,
-            });
-
-            if (position.reviews && position.reviews.length > 0) {
-                 autoTable(doc, {
-                    head: [['S.No', 'Feedback Received']],
-                    body: (position.reviews || []).map((review, reviewIndex) => [reviewIndex + 1, review.feedback]),
-                    startY: (doc as any).lastAutoTable.finalY + 10,
-                    theme: 'grid',
-                    headStyles: { fillColor: [0, 121, 107], textColor: [255, 255, 255], font: 'times' },
-                    bodyStyles: { font: 'times' },
-                    columnStyles: {
-                        0: { cellWidth: 15, halign: 'center' },
-                    },
-                });
-            } else {
-                autoTable(doc, {
-                    body: [['No feedback submitted for this position.']],
-                    startY: (doc as any).lastAutoTable.finalY + 10,
-                    theme: 'plain',
-                });
-            }
-        });
-    } else {
-        const totalParticipants = totalCompletedVoters;
-        room.positions.forEach((position, index) => {
-            const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-            const startY = (doc as any).lastAutoTable.finalY + (index === 0 ? 15 : 20);
-
-            autoTable(doc, {
-                body: [[{ content: `Results for Position: ${position.title}`, styles: { fontSize: 16, fontStyle: 'bold' } }]],
-                theme: 'plain',
-                styles: { font: 'times', cellPadding: 0 },
-                startY: startY,
-            });
-
-            const tableBody = sortedCandidates.map((candidate, idx) => {
-                const percentage = totalParticipants > 0 ? (((candidate.voteCount || 0) / totalParticipants) * 100).toFixed(1) + "%" : "0.0%";
-                const isWinner = candidate.isOfficialWinner;
-                const rank = isWinner ? `🏆 ${idx + 1}` : `${idx + 1}`;
-                return [rank, candidate.name, `${candidate.voteCount || 0}/${totalParticipants}`, percentage];
-            });
-
-             autoTable(doc, {
-                head: [['Rank', 'Candidate Name', 'Votes Received', 'Vote Percentage']],
-                body: tableBody,
-                startY: (doc as any).lastAutoTable.finalY + 5,
-                theme: 'grid',
-                headStyles: { fillColor: [0, 121, 107], textColor: [255, 255, 255], font: 'times' },
-                bodyStyles: { font: 'times' },
-            });
-        });
-    }
-
-    doc.save(`${safeTitle}.pdf`);
-    setIsExporting(false);
-  };
-
-  const handleExportFinalReport = async () => {
-    if (!room || room.roomType === 'review' || !conflicts.allConflictsResolved) return;
-    setIsExporting(true);
-
-    let mdContent = `# Official Election Report: ${room.title}\n\n`;
-    mdContent += `This report was generated on **${new Date().toLocaleString()}** after the election room was closed and all conflicts were resolved.\n\n`;
-    mdContent += `A total of **${totalCompletedVoters}** participant(s) completed the voting process.\n\n`;
-    mdContent += "---\n\n";
-    mdContent += "## Final Declared Winners\n\n";
-    mdContent += "| S.No | Position | Winner | Votes Received |\n";
-    mdContent += "|:----:|:---------|:-------|:---------------|\n";
-
-    const officialWinners = room.positions
-        .map(p => {
-            const winner = p.candidates.find(c => c.isOfficialWinner);
-            return winner ? { ...winner, positionTitle: p.title } : null;
-        })
-        .filter((w): w is Candidate & { positionTitle: string } => w !== null);
-
-    officialWinners.forEach((winner, index) => {
-        mdContent += `| ${index + 1} | ${winner.positionTitle} | ${winner.name} | ${winner.voteCount || 0} |\n`;
-    });
-
-    const blob = new Blob([mdContent], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const safeTitle = room.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    link.download = `${safeTitle}_official_report.md`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    setIsExporting(false);
-  };
-
 
   if (loading) {
     return <ResultsLoading />;
@@ -537,33 +399,10 @@ export default function ElectionResultsPage() {
             <p className="text-muted-foreground mt-2">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button disabled={isExporting} className="w-full sm:w-auto">
-                        {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
-                        {isExporting ? 'Exporting...' : 'Export'}
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={handleExportPdf}>
-                        <File className="mr-2 h-4 w-4" />
-                        Export as PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportMarkdown}>
-                        <FileText className="mr-2 h-4 w-4" />
-                        Export as .md Code
-                    </DropdownMenuItem>
-                     {room.status === 'closed' && room.roomType === 'voting' && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleExportFinalReport} disabled={!conflicts.allConflictsResolved}>
-                                <FileText className="mr-2 h-4 w-4 text-destructive" />
-                                <span className="text-destructive">Export Official Report</span>
-                            </DropdownMenuItem>
-                        </>
-                    )}
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <Button disabled={isExporting} className="w-full sm:w-auto" onClick={handleExportMarkdown}>
+                {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
+                {isExporting ? 'Exporting...' : 'Export as .md Code'}
+            </Button>
         </div>
       </div>
 
@@ -753,10 +592,8 @@ export default function ElectionResultsPage() {
         </AlertDialogContent>
     </AlertDialog>
 
-
-    <div className="hidden">
-      <ResultsPdfLayout room={room} totalCompletedVoters={totalCompletedVoters} />
-    </div>
     </>
   );
 }
+
+    
