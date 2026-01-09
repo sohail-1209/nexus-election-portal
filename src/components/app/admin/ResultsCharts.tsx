@@ -4,15 +4,13 @@
 import type { Position } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
+  PieChart,
+  Pie,
   Tooltip,
   ResponsiveContainer,
   Cell,
-  LabelList,
-} from "recharts"; // Shadcn/ui charts use recharts
+  Legend,
+} from "recharts"; 
 import { useMemo } from "react";
 
 interface ResultsChartsProps {
@@ -30,19 +28,31 @@ const CHART_COLORS = [
   "hsl(174 100% 32%)",
 ];
 
+const RADIAN = Math.PI / 180;
+const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }: any) => {
+  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+  const x = cx + radius * Math.cos(-midAngle * RADIAN);
+  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+  if (percent * 100 < 5) return null; // Don't render label if slice is too small
+
+  return (
+    <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central">
+      {`${(percent * 100).toFixed(0)}%`}
+    </text>
+  );
+};
+
 
 export default function ResultsCharts({ positions }: ResultsChartsProps) {
-  const foregroundColor = "hsl(var(--foreground))"; // From globals.css
-  const mutedForegroundColor = "hsl(var(--muted-foreground))";
-
   const chartDataByPosition = useMemo(() => {
     return positions.map(position => ({
       positionTitle: position.title,
+      // The name/value structure is required for pie charts
       candidatesData: position.candidates.map((candidate, index) => ({
         name: candidate.name,
-        votes: candidate.voteCount || 0,
-        fill: CHART_COLORS[index % CHART_COLORS.length],
-      })).sort((a,b) => b.votes - a.votes), // Sort for bar chart
+        value: candidate.voteCount || 0,
+      })).filter(c => c.value > 0), // Only include candidates with votes
     }));
   }, [positions]);
 
@@ -52,51 +62,64 @@ export default function ResultsCharts({ positions }: ResultsChartsProps) {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-      {chartDataByPosition.map(({ positionTitle, candidatesData }) => (
-        <Card key={positionTitle} className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl font-headline">{positionTitle} - Vote Distribution</CardTitle>
-            <CardDescription>A visual representation of votes for each candidate in this position.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {candidatesData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={candidatesData} layout="vertical" margin={{ left: 30, right: 30, top:5, bottom:5 }}>
-                  <XAxis type="number" stroke={mutedForegroundColor} tick={{ fill: mutedForegroundColor, fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis 
-                    dataKey="name" 
-                    type="category" 
-                    stroke={foregroundColor} 
-                    tick={{ fill: foregroundColor, fontSize: 14 }} 
-                    width={120} 
-                    interval={0} 
-                    tickLine={false}
-                    axisLine={false}
-                    style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                  />
-                  <Tooltip
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--background))',
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                      color: 'hsl(var(--foreground))'
-                    }}
-                  />
-                  <Bar dataKey="votes" barSize={30} radius={[0, 8, 8, 0]}>
-                    <LabelList dataKey="votes" position="right" offset={10} className="fill-foreground font-semibold" />
-                    {candidatesData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-muted-foreground text-center py-4">No candidates or votes for this position to display charts.</p>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      {chartDataByPosition.map(({ positionTitle, candidatesData }) => {
+        const totalVotes = candidatesData.reduce((sum, entry) => sum + entry.value, 0);
+        
+        return (
+          <Card key={positionTitle} className="shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-xl font-headline">{positionTitle} - Vote Distribution</CardTitle>
+              <CardDescription>
+                A visual representation of votes for each candidate in this position. Total votes: {totalVotes}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {candidatesData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={350}>
+                  <PieChart>
+                    <Tooltip
+                      cursor={{ fill: 'hsl(var(--muted))' }}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--background))',
+                        borderColor: 'hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      formatter={(value: number, name: string) => [`${value} vote(s)`, name]}
+                    />
+                    <Legend 
+                      iconSize={10} 
+                      wrapperStyle={{
+                        fontSize: '14px',
+                        lineHeight: '20px',
+                      }}
+                    />
+                    <Pie
+                      data={candidatesData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={120}
+                      fill="#8884d8"
+                      labelLine={false}
+                      label={renderCustomizedLabel}
+                    >
+                      {candidatesData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-[350px] flex items-center justify-center">
+                  <p className="text-muted-foreground text-center py-4">No votes have been cast for this position yet.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   );
 }
