@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { createElectionGroup } from "@/lib/electionRoomService";
 import type { ElectionRoom } from "@/lib/types";
-import { Layers, Loader2, Eye, EyeOff, Lock } from "lucide-react";
+import { Layers, Loader2, Eye, EyeOff, Lock, ArrowRight } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface GroupRoomsDialogProps {
