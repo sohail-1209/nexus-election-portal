@@ -1,5 +1,5 @@
 
-import type { Position, Candidate } from "@/lib/types";
+import type { Position, Candidate, ElectionRoom } from "@/lib/types";
 import {
   Table,
   TableBody,
@@ -17,9 +17,10 @@ import { cn } from "@/lib/utils";
 interface ResultsTableProps {
   positions: Position[];
   totalCompletedVoters: number;
+  room: ElectionRoom; // Pass the original room data to get original vote counts
 }
 
-export default function ResultsTable({ positions, totalCompletedVoters }: ResultsTableProps) {
+export default function ResultsTable({ positions, totalCompletedVoters, room }: ResultsTableProps) {
   if (!positions || positions.length === 0) {
     return <p className="text-muted-foreground text-center py-8">No positions or results to display.</p>;
   }
@@ -27,9 +28,20 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
   return (
     <div className="space-y-8">
       {positions.map((position) => {
-        // Filter out candidates with negative vote counts (used for conflict resolution)
+        const originalPosition = room.positions.find(p => p.id === position.id);
+
+        const candidatesWithOriginalVotes = position.candidates.map(cand => {
+            const originalCand = originalPosition?.candidates.find(c => c.id === cand.id);
+            return {
+                ...cand,
+                voteCount: originalCand?.voteCount || 0,
+            };
+        });
+
+        // Filter out candidates with negative vote counts (used for conflict resolution disqualification)
         const eligibleCandidates = position.candidates.filter(c => (c.voteCount ?? 0) >= 0);
         const sortedCandidates = [...eligibleCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        
         const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
         
         return (
@@ -46,9 +58,12 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedCandidates.map((candidate, index) => {
-                  const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
-                  const isWinnerByVotes = maxVotes > 0 && (candidate.voteCount || 0) === maxVotes;
+                {candidatesWithOriginalVotes.sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0)).map((candidate, index) => {
+                  const voteCount = candidate.voteCount || 0;
+                  const percentage = totalCompletedVoters > 0 ? ((voteCount / totalCompletedVoters) * 100).toFixed(1) : "0.0";
+                  
+                  // Determine winner based on sorted eligible candidates
+                  const isWinnerByVotes = maxVotes > 0 && voteCount === maxVotes && eligibleCandidates.some(c => c.id === candidate.id);
                   
                   return (
                     <TableRow key={candidate.id} className={cn(isWinnerByVotes && "bg-green-600/10")}>
@@ -73,19 +88,19 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
                       </TableCell>
                       <TableCell>{candidate.name}</TableCell>
                       <TableCell className="text-right font-semibold">
-                        {`${candidate.voteCount || 0} / ${totalCompletedVoters}`}
+                        {`${voteCount} / ${totalCompletedVoters}`}
                       </TableCell>
                       <TableCell className="text-right">{percentage}%</TableCell>
                     </TableRow>
                   );
                 })}
-                {sortedCandidates.length === 0 && (
+                {position.candidates.length === 0 && (
                     <TableRow>
                         <TableCell colSpan={5} className="text-center text-muted-foreground h-24">No candidates for this position.</TableCell>
                     </TableRow>
                 )}
               </TableBody>
-               {sortedCandidates.length > 0 && (
+               {position.candidates.length > 0 && (
                  <TableCaption className="py-2 text-sm">Results for {position.title}. Total completed participants: {totalCompletedVoters}</TableCaption>
                )}
             </Table>
@@ -95,3 +110,5 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
     </div>
   );
 }
+
+    

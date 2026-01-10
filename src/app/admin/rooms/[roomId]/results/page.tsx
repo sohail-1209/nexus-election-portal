@@ -197,40 +197,55 @@ export default function ElectionResultsPage() {
   
   const finalPositions = useMemo(() => {
     if (!room) return [];
-    if (room.finalized) return room.finalizedResults!.positions;
-    if (room.roomType !== 'voting' || Object.keys(resolvedConflicts).length === 0) {
+    if (room.finalized && room.finalizedResults) return room.finalizedResults.positions;
+    if (room.roomType !== 'voting' || !hasConfirmedResolutions || winnerConflicts.length === 0) {
       return room.positions;
     }
 
+    // Create a deep copy of positions to manipulate
     let tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
     
+    // Create a map of candidates who are confirmed for a specific position
+    const confirmedWinners = new Map<string, string>(); // positionId -> candidateId
     for (const candId in resolvedConflicts) {
-      const chosenPosId = resolvedConflicts[candId];
-      const conflict = winnerConflicts.find(c => c.candidateId === candId);
-      if (!conflict) continue;
-
-      conflict.wonPositions.forEach(p => {
-        if (p.positionId !== chosenPosId) {
-          const posIndex = tempPositions.findIndex(tp => tp.id === p.positionId);
-          if (posIndex > -1) {
-            const candIndex = tempPositions[posIndex].candidates.findIndex(c => c.id === candId);
-            if (candIndex > -1) {
-              // Disqualify by setting vote count to -1 for this iteration
-              tempPositions[posIndex].candidates[candIndex].voteCount = -1;
-            }
+        const chosenPosId = resolvedConflicts[candId];
+        confirmedWinners.set(chosenPosId, candId);
+    }
+    
+    // First pass: Disqualify candidates from positions they didn't win according to resolutions
+    tempPositions.forEach(pos => {
+      pos.candidates.forEach(cand => {
+        const conflict = winnerConflicts.find(c => c.candidateId === cand.id);
+        if (conflict) {
+          const chosenPosId = resolvedConflicts[cand.id];
+          // If the candidate is part of a conflict AND this isn't their chosen position, disqualify them
+          if (pos.id !== chosenPosId) {
+            cand.voteCount = -1; // Mark as disqualified for sorting
           }
         }
       });
-    }
-    return tempPositions;
-  }, [room, resolvedConflicts, winnerConflicts]);
+    });
+    
+    // Second pass: Recalculate vote counts for display, but keep them disqualified for winner logic
+    return tempPositions.map(pos => {
+        return {
+            ...pos,
+            candidates: pos.candidates.map(cand => ({
+                ...cand,
+                // Reset voteCount for display, but the sorting has already happened based on -1
+                voteCount: room.positions.find(p => p.id === pos.id)?.candidates.find(c => c.id === cand.id)?.voteCount || 0
+            }))
+        }
+    });
+
+  }, [room, resolvedConflicts, winnerConflicts, hasConfirmedResolutions]);
 
 
   const handleExportMarkdown = async () => {
     if (!room) return;
     setIsExporting(true);
 
-    const results = finalPositions;
+    const positionsToExport = finalPositions || room.positions;
     const participants = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
 
     let mdContent = `# 📊 Results for: ${room.title}\n\n`;
@@ -241,7 +256,7 @@ export default function ElectionResultsPage() {
 
     if (room.roomType === 'review') {
         mdContent += `## Review Summary\n\n`;
-        results.forEach(position => {
+        positionsToExport.forEach(position => {
             mdContent += `### **${position.title}** - *${position.candidates[0]?.name || 'N/A'}*\n`;
             mdContent += `- **Average Rating:** ${position.averageRating?.toFixed(2) || 'N/A'} / 5.00 ★\n`;
             mdContent += `- **Total Reviews:** ${position.reviews?.length || 0}\n\n`;
@@ -259,8 +274,11 @@ export default function ElectionResultsPage() {
       mdContent += `## Voting Results\n\n`;
       mdContent += `*Based on **${participants}** completed participant(s).*\n\n`;
 
-      results.forEach(position => {
-        const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+      positionsToExport.forEach(position => {
+        // Here we use the potentially modified vote counts from finalPositions
+        const candidatesInPosition = finalPositions.find(p => p.id === position.id)?.candidates || position.candidates;
+        const eligibleCandidates = candidatesInPosition.filter(c => (c.voteCount ?? -1) >= 0);
+        const sortedCandidates = [...eligibleCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
         
         mdContent += `### ${position.title}\n\n`;
@@ -268,10 +286,11 @@ export default function ElectionResultsPage() {
         mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
         sortedCandidates.forEach((candidate, index) => {
-          const percentage = participants > 0 ? (((candidate.voteCount || 0) / participants) * 100).toFixed(1) : "0.0";
-          const isWinner = maxVotes > 0 && (candidate.voteCount || 0) === maxVotes;
+          const originalVoteCount = room.positions.find(p=>p.id === position.id)?.candidates.find(c=>c.id===candidate.id)?.voteCount || 0;
+          const percentage = participants > 0 ? ((originalVoteCount / participants) * 100).toFixed(1) : "0.0";
+          const isWinner = maxVotes > 0 && originalVoteCount === maxVotes;
           const rankDisplay = isWinner ? `🏆 ${index + 1}` : `${index + 1}`;
-          mdContent += `| ${rankDisplay} | ${candidate.name} | ${candidate.voteCount || 0}/${participants} | ${percentage}% |\n`;
+          mdContent += `| ${rankDisplay} | ${candidate.name} | ${originalVoteCount}/${participants} | ${percentage}% |\n`;
         });
         mdContent += `\n`;
       });
@@ -322,10 +341,11 @@ export default function ElectionResultsPage() {
 
   const renderResults = () => {
     if (room.roomType === 'review') {
+        const positionsToDisplay = room.finalized ? room.finalizedResults?.positions || [] : room.positions;
         return (
             <div className="space-y-8">
-                <ReviewResultsDisplay room={room} positions={finalPositions} />
-                <ReviewLeaderboard positions={finalPositions} />
+                <ReviewResultsDisplay room={room} positions={positionsToDisplay} />
+                <ReviewLeaderboard positions={positionsToDisplay} />
             </div>
         )
     }
@@ -340,7 +360,7 @@ export default function ElectionResultsPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ResultsTable positions={finalPositions} totalCompletedVoters={participantsCount} />
+                <ResultsTable positions={finalPositions} totalCompletedVoters={participantsCount} room={room} />
             </CardContent>
         </Card>
     )
@@ -428,3 +448,5 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
+
+    
