@@ -200,44 +200,29 @@ export default function ElectionResultsPage() {
     if (!room) return [];
     if (room.finalized && room.finalizedResults) return room.finalizedResults.positions;
     if (room.roomType !== 'voting' || !hasConfirmedResolutions || winnerConflicts.length === 0) {
-      return room.positions;
+        return room.positions;
     }
 
-    // Create a deep copy of positions to manipulate
+    // Create a deep copy to manipulate, which includes vote counts
     let tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
-    
-    // Create a map of candidates who are confirmed for a specific position
-    const confirmedWinners = new Map<string, string>(); // positionId -> candidateId
-    for (const candId in resolvedConflicts) {
-        const chosenPosId = resolvedConflicts[candId];
-        confirmedWinners.set(chosenPosId, candId);
-    }
-    
-    // First pass: Disqualify candidates from positions they didn't win according to resolutions
+
+    // This loop marks candidates as disqualified from positions they didn't win in the resolution
     tempPositions.forEach(pos => {
-      pos.candidates.forEach(cand => {
-        const conflict = winnerConflicts.find(c => c.candidateId === cand.id);
-        if (conflict) {
-          const chosenPosId = resolvedConflicts[cand.id];
-          // If the candidate is part of a conflict AND this isn't their chosen position, disqualify them
-          if (pos.id !== chosenPosId) {
-            cand.voteCount = -1; // Mark as disqualified for sorting
-          }
-        }
-      });
+        pos.candidates.forEach(cand => {
+            const isConflicted = winnerConflicts.some(c => c.candidateId === cand.id);
+            if (isConflicted) {
+                const chosenPositionId = resolvedConflicts[cand.id];
+                // If this candidate is in a conflict and the current position is NOT their chosen one, disqualify them
+                if (pos.id !== chosenPositionId) {
+                    // Using a negative voteCount as a "disqualified" marker for this position
+                    cand.voteCount = -1;
+                }
+            }
+        });
     });
     
-    // Second pass: Recalculate vote counts for display, but keep them disqualified for winner logic
-    return tempPositions.map(pos => {
-        return {
-            ...pos,
-            candidates: pos.candidates.map(cand => ({
-                ...cand,
-                // Reset voteCount for display, but the sorting has already happened based on -1
-                voteCount: room.positions.find(p => p.id === pos.id)?.candidates.find(c => c.id === cand.id)?.voteCount || 0
-            }))
-        }
-    });
+    // This returns the positions with some candidates potentially marked with voteCount: -1
+    return tempPositions;
 
   }, [room, resolvedConflicts, winnerConflicts, hasConfirmedResolutions]);
 
@@ -276,8 +261,9 @@ export default function ElectionResultsPage() {
       mdContent += `*Based on **${participants}** completed participant(s).*\n\n`;
 
       positionsToExport.forEach(position => {
-        // Here we use the potentially modified vote counts from finalPositions
-        const candidatesInPosition = finalPositions.find(p => p.id === position.id)?.candidates || position.candidates;
+        // Use the original room data for accurate vote counts in the export
+        const originalPosition = room.positions.find(p => p.id === position.id);
+        const candidatesInPosition = finalPositions.find(p => p.id === position.id)?.candidates || [];
         const eligibleCandidates = candidatesInPosition.filter(c => (c.voteCount ?? -1) >= 0);
         const sortedCandidates = [...eligibleCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
@@ -286,10 +272,16 @@ export default function ElectionResultsPage() {
         mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
         mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
-        sortedCandidates.forEach((candidate, index) => {
-          const originalVoteCount = room.positions.find(p=>p.id === position.id)?.candidates.find(c=>c.id===candidate.id)?.voteCount || 0;
+        // Sort the candidates with original vote counts for display
+        const displayCandidates = [...(originalPosition?.candidates || [])].sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
+
+        displayCandidates.forEach((candidate, index) => {
+          const originalVoteCount = candidate.voteCount || 0;
           const percentage = participants > 0 ? ((originalVoteCount / participants) * 100).toFixed(1) : "0.0";
-          const isWinner = maxVotes > 0 && originalVoteCount === maxVotes;
+          
+          // Check if this candidate is a winner in the *resolved* list
+          const isWinner = maxVotes > 0 && eligibleCandidates.some(c => c.id === candidate.id && (c.voteCount || 0) === maxVotes);
+
           const rankDisplay = isWinner ? `🏆 ${index + 1}` : `${index + 1}`;
           mdContent += `| ${rankDisplay} | ${candidate.name} | ${originalVoteCount}/${participants} | ${percentage}% |\n`;
         });
@@ -330,15 +322,17 @@ export default function ElectionResultsPage() {
           </Button>
         </CardContent>
       </Card>
-    )
+    );
   }
   if (!room) return notFound();
 
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
-  const conflictsResolved = winnerConflicts.length === 0 || hasConfirmedResolutions;
-  const showFinalizeButton = room.status === 'closed' && !room.finalized && conflictsResolved;
+  const conflictsExist = winnerConflicts.length > 0;
+  const conflictsResolved = conflictsExist && hasConfirmedResolutions;
+  const canFinalize = room.status === 'closed' && !room.finalized && (!conflictsExist || conflictsResolved);
+  
 
   const renderResults = () => {
     if (room.roomType === 'review') {
@@ -348,7 +342,7 @@ export default function ElectionResultsPage() {
                 <ReviewResultsDisplay room={room} positions={positionsToDisplay} />
                 <ReviewLeaderboard positions={positionsToDisplay} />
             </div>
-        )
+        );
     }
 
     return (
@@ -364,8 +358,8 @@ export default function ElectionResultsPage() {
                 <ResultsTable positions={finalPositions} totalCompletedVoters={participantsCount} room={room} />
             </CardContent>
         </Card>
-    )
-  }
+    );
+  };
 
 
   return (
@@ -404,7 +398,7 @@ export default function ElectionResultsPage() {
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                 {isExporting ? 'Exporting...' : 'Export as .md'}
             </Button>
-            {showFinalizeButton && (
+            {canFinalize && (
               <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />
             )}
         </div>
@@ -418,19 +412,21 @@ export default function ElectionResultsPage() {
                 The underlying votes/reviews for this room have been permanently deleted. The results shown are static.
                 </AlertDescription>
             </Alert>
-        ) : room.status === 'closed' && (
+        ) : room.status === 'closed' ? (
          <Alert variant="default" className="border-amber-600/50 bg-amber-500/5">
             <ShieldAlert className="h-4 w-4 text-amber-600" />
             <AlertTitle>Ready to Finalize</AlertTitle>
             <AlertDescription>
-                {conflictsResolved ? (
-                    "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
-                ) : (
-                    "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
-                )}
+              {!conflictsExist ? (
+                "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
+              ) : conflictsResolved ? (
+                 "Conflicts have been resolved. You may now finalize the results."
+              ) : (
+                "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
+              )}
             </AlertDescription>
          </Alert>
-       )}
+       ) : null}
 
       {room.status !== 'closed' && !room.finalized && (
         <Card className="border-primary bg-primary/5">
@@ -444,7 +440,7 @@ export default function ElectionResultsPage() {
         </Card>
       )}
       
-      {winnerConflicts.length > 0 && !hasConfirmedResolutions && room.status === 'closed' && (
+      {conflictsExist && !conflictsResolved && room.status === 'closed' && (
         <ConflictResolver conflicts={winnerConflicts} onResolve={handleConfirmResolutions} />
       )}
 

@@ -28,22 +28,20 @@ export default function ResultsTable({ positions, totalCompletedVoters, room }: 
   return (
     <div className="space-y-8">
       {positions.map((position) => {
+        // Use the original, unmodified room data to get accurate vote counts for display
         const originalPosition = room.positions.find(p => p.id === position.id);
 
-        const candidatesWithOriginalVotes = position.candidates.map(cand => {
-            const originalCand = originalPosition?.candidates.find(c => c.id === cand.id);
-            return {
-                ...cand,
-                voteCount: originalCand?.voteCount || 0,
-            };
-        });
-
-        // Filter out candidates with negative vote counts (used for conflict resolution disqualification)
+        // This list contains candidates with potentially modified vote counts (-1 for disqualified)
         const eligibleCandidates = position.candidates.filter(c => (c.voteCount ?? 0) >= 0);
-        const sortedCandidates = [...eligibleCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         
-        const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
-        
+        // Find the new winner(s) from the pool of eligible candidates
+        const maxVotes = eligibleCandidates.length > 0
+          ? Math.max(...eligibleCandidates.map(c => c.voteCount || 0))
+          : 0;
+
+        // Sort the candidates for display using their *original* vote counts
+        const sortedDisplayCandidates = [...(originalPosition?.candidates || [])].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+
         return (
           <div key={position.id} className="border rounded-lg shadow-sm">
             <h3 className="text-xl font-semibold mb-3 font-headline p-4 border-b">{position.title}</h3>
@@ -58,17 +56,19 @@ export default function ResultsTable({ positions, totalCompletedVoters, room }: 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {candidatesWithOriginalVotes.sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0)).map((candidate, index) => {
+                {sortedDisplayCandidates.map((candidate, index) => {
                   const voteCount = candidate.voteCount || 0;
                   const percentage = totalCompletedVoters > 0 ? ((voteCount / totalCompletedVoters) * 100).toFixed(1) : "0.0";
                   
-                  // Determine winner based on sorted eligible candidates
-                  const isWinnerByVotes = maxVotes > 0 && voteCount === maxVotes && eligibleCandidates.some(c => c.id === candidate.id);
+                  // A candidate is a winner if they are in the eligible pool and their vote count matches the max votes of that pool
+                  const isWinner = maxVotes > 0 && 
+                                   eligibleCandidates.some(c => c.id === candidate.id) &&
+                                   voteCount === maxVotes;
                   
                   return (
-                    <TableRow key={candidate.id} className={cn(isWinnerByVotes && "bg-green-600/10")}>
+                    <TableRow key={candidate.id} className={cn(isWinner && "bg-green-600/10")}>
                       <TableCell className="font-medium text-center">
-                        {isWinnerByVotes ? (
+                        {isWinner ? (
                             <Badge variant="default" className="bg-amber-500 hover:bg-amber-600 text-white">
                                 <Trophy className="h-3 w-3 mr-1" /> Winner
                             </Badge>
