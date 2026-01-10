@@ -1,4 +1,3 @@
-
 export interface Candidate {
   id: string;
   name: string;
@@ -10,7 +9,7 @@ export interface Candidate {
 export interface Review {
   rating: number;
   feedback: string;
-  reviewerEmail: string;
+  reviewerEmail: string; // This will only exist on live data, not finalized data
   reviewedAt: string;
 }
 
@@ -24,6 +23,12 @@ export interface Position {
   ratingDistribution?: { name: string, count: number }[];
 }
 
+export interface FinalizedResults {
+  positions: Position[];
+  totalParticipants: number;
+  finalizedAt: string;
+}
+
 export interface ElectionRoom {
   id:string;
   title: string;
@@ -35,6 +40,8 @@ export interface ElectionRoom {
   updatedAt?: string; // Added for Firestore timestamp
   status: 'pending' | 'active' | 'closed';
   roomType?: 'voting' | 'review';
+  finalized?: boolean; // New flag to indicate if results are baked in
+  finalizedResults?: FinalizedResults; // Stored static results
 }
 
 export interface Voter {

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -9,7 +8,7 @@ import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService
 import type { ElectionRoom, Position } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users, Share2 } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users, Share2, ShieldAlert } from "lucide-react";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -27,6 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import ShareableLinkDisplay from "@/components/app/admin/ShareableLinkDisplay";
+import FinalizeRoomDialog from "@/components/app/admin/FinalizeRoomDialog";
 
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
@@ -102,6 +102,7 @@ export default function ElectionResultsPage() {
   const fetchRoomData = useCallback(async () => {
     if (!roomId) return;
     try {
+      // Always fetch with vote counts to ensure data is fresh
       const roomData = await getElectionRoomById(roomId, { withVoteCounts: true });
       if (!roomData) {
         notFound();
@@ -109,11 +110,22 @@ export default function ElectionResultsPage() {
       }
       setRoom(roomData);
 
-      if (roomData.roomType !== 'review') {
-        const voters = await getVotersForRoom(roomId);
-        const completedVoters = voters.filter(v => v.status === 'completed');
-        setTotalCompletedVoters(completedVoters.length);
+      // If the room isn't finalized, fetch voter count separately
+      if (!roomData.finalized) {
+        if (roomData.roomType !== 'review') {
+          const voters = await getVotersForRoom(roomId);
+          const completedVoters = voters.filter(v => v.status === 'completed');
+          setTotalCompletedVoters(completedVoters.length);
+        } else {
+            // For review rooms, the total is the number of reviews on the most reviewed position
+            const maxReviews = Math.max(...(roomData.positions.map(p => p.reviews?.length || 0)), 0);
+            setTotalCompletedVoters(maxReviews);
+        }
+      } else if (roomData.finalizedResults) {
+        // If finalized, use the stored total
+        setTotalCompletedVoters(roomData.finalizedResults.totalParticipants);
       }
+
     } catch (err: any) {
       console.error("Failed to fetch results:", err);
       if (err.code === 'permission-denied') {
@@ -125,6 +137,7 @@ export default function ElectionResultsPage() {
       setLoading(false);
     }
   }, [roomId]);
+
 
   useEffect(() => {
     if (!roomId) {
@@ -147,6 +160,9 @@ export default function ElectionResultsPage() {
     if (!room) return;
     setIsExporting(true);
 
+    const results = room.finalized ? room.finalizedResults!.positions : room.positions;
+    const participants = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
+
     let mdContent = `# 📊 Results for: ${room.title}\n\n`;
     mdContent += `*${room.description}*\n\n`;
     mdContent += `**Generated on:** ${new Date().toLocaleString()}\n\n`;
@@ -155,7 +171,7 @@ export default function ElectionResultsPage() {
 
     if (room.roomType === 'review') {
         mdContent += `## Review Summary\n\n`;
-        room.positions.forEach(position => {
+        results.forEach(position => {
             mdContent += `### **${position.title}** - *${position.candidates[0]?.name || 'N/A'}*\n`;
             mdContent += `- **Average Rating:** ${position.averageRating?.toFixed(2) || 'N/A'} / 5.00 ★\n`;
             mdContent += `- **Total Reviews:** ${position.reviews?.length || 0}\n\n`;
@@ -171,9 +187,9 @@ export default function ElectionResultsPage() {
         });
     } else {
       mdContent += `## Voting Results\n\n`;
-      mdContent += `*Based on **${totalCompletedVoters}** completed participant(s).*\n\n`;
+      mdContent += `*Based on **${participants}** completed participant(s).*\n\n`;
 
-      room.positions.forEach(position => {
+      results.forEach(position => {
         const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
         
@@ -182,10 +198,10 @@ export default function ElectionResultsPage() {
         mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
         sortedCandidates.forEach((candidate, index) => {
-          const percentage = totalCompletedVoters > 0 ? (((candidate.voteCount || 0) / totalCompletedVoters) * 100).toFixed(1) : "0.0";
+          const percentage = participants > 0 ? (((candidate.voteCount || 0) / participants) * 100).toFixed(1) : "0.0";
           const isWinner = maxVotes > 0 && (candidate.voteCount || 0) === maxVotes;
           const rankDisplay = isWinner ? `🏆 ${index + 1}` : `${index + 1}`;
-          mdContent += `| ${rankDisplay} | ${candidate.name} | ${candidate.voteCount || 0}/${totalCompletedVoters} | ${percentage}% |\n`;
+          mdContent += `| ${rankDisplay} | ${candidate.name} | ${candidate.voteCount || 0}/${participants} | ${percentage}% |\n`;
         });
         mdContent += `\n`;
       });
@@ -235,13 +251,15 @@ export default function ElectionResultsPage() {
   }
 
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
+  const positionsToDisplay = room.finalized ? room.finalizedResults!.positions : room.positions;
+  const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
 
   const renderResults = () => {
     if (room.roomType === 'review') {
         return (
             <div className="space-y-8">
-                <ReviewResultsDisplay room={room} />
-                <ReviewLeaderboard positions={room.positions} />
+                <ReviewResultsDisplay room={room} positions={positionsToDisplay} />
+                <ReviewLeaderboard positions={positionsToDisplay} />
             </div>
         )
     }
@@ -252,11 +270,11 @@ export default function ElectionResultsPage() {
                 <CardTitle>Detailed Results</CardTitle>
                 <CardDescription>
                 Comprehensive breakdown of votes for each candidate. 
-                Vote counts and percentages are based on the {totalCompletedVoters} participant(s) who completed the process.
+                Vote counts and percentages are based on the {participantsCount} participant(s) who completed the process.
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ResultsTable positions={room.positions} totalCompletedVoters={totalCompletedVoters} />
+                <ResultsTable positions={positionsToDisplay} totalCompletedVoters={participantsCount} />
             </CardContent>
         </Card>
     )
@@ -300,32 +318,31 @@ export default function ElectionResultsPage() {
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                 {isExporting ? 'Exporting...' : 'Export as .md Code'}
             </Button>
+            {!room.finalized && (
+              <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />
+            )}
         </div>
       </div>
 
-       {room.status === 'closed' && room.roomType === 'voting' && (
-         <Alert variant="default" className="border-green-600/50 bg-green-500/5">
-            <div className="flex justify-between items-center w-full">
-                <div>
-                   <AlertTitle className="flex items-center">
-                        <CheckCircle className="h-4 w-4 text-green-600 mr-2" />
-                        Election Closed
-                    </AlertTitle>
-                   <AlertDescription>
-                    This election is complete. The results below are final.
-                   </AlertDescription>
-                </div>
-                 <Button asChild variant="outline" size="sm">
-                    <Link href={`/admin/rooms/${room.id}/voters`}>
-                        <Users className="mr-2 h-4 w-4" /> View Participant List
-                    </Link>
-                </Button>
-            </div>
+        {room.finalized ? (
+            <Alert variant="default" className="border-green-600/50 bg-green-500/5">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <AlertTitle>Results Finalized &amp; Anonymized</AlertTitle>
+                <AlertDescription>
+                The underlying votes/reviews for this room have been permanently deleted. The results shown are static.
+                </AlertDescription>
+            </Alert>
+        ) : room.status === 'closed' && (
+         <Alert variant="default" className="border-amber-600/50 bg-amber-500/5">
+            <ShieldAlert className="h-4 w-4 text-amber-600" />
+            <AlertTitle>Election Closed</AlertTitle>
+            <AlertDescription>
+                This election is complete and results are final. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible.
+            </AlertDescription>
          </Alert>
        )}
 
-
-      {room.status !== 'closed' && (
+      {room.status !== 'closed' && !room.finalized && (
         <Card className="border-primary bg-primary/5">
             <CardHeader>
                 <CardTitle>Room In Progress or Pending</CardTitle>

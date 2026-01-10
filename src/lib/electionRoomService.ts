@@ -1,4 +1,3 @@
-
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
@@ -49,6 +48,24 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
   
   const data = docSnap.data();
   if (!data) return null;
+
+  // If results are finalized, they are stored on the doc. No need to query subcollections.
+  if (data.finalized && data.finalizedResults) {
+      return {
+          id: docSnap.id,
+          title: data.title || "Untitled Room",
+          description: data.description || "No description.",
+          status: (data.status as ElectionRoom['status']) || 'closed',
+          roomType: data.roomType || 'voting',
+          finalized: true,
+          finalizedResults: data.finalizedResults,
+          createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+          // These fields are less relevant post-finalization but are kept for type consistency
+          isAccessRestricted: data.isAccessRestricted === true,
+          accessCode: data.accessCode || undefined,
+          positions: data.finalizedResults.positions,
+      };
+  }
 
   let finalPositions: Position[] = (data.positions || []).map((p: any) => ({
     id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
@@ -154,6 +171,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     updatedAt: updatedAt,
     status: (data.status as ElectionRoom['status']) || 'pending',
     roomType: data.roomType || 'voting',
+    finalized: data.finalized || false,
   };
 }
 
@@ -366,4 +384,88 @@ export async function submitReview(
     console.error("Error submitting review:", error);
     return { success: false, message: error.message || "An unexpected error occurred while submitting your review." };
   }
+}
+
+export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: string): Promise<{ success: boolean, message: string }> {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+        return { success: false, message: "Authentication required. Please log in again." };
+    }
+
+    try {
+        const credential = EmailAuthProvider.credential(user.email, adminPassword);
+        await reauthenticateWithCredential(user, credential);
+
+        const roomRef = doc(db, "electionRooms", roomId);
+        const roomSnap = await getDoc(roomRef);
+
+        if (!roomSnap.exists()) {
+            return { success: false, message: "Room not found." };
+        }
+
+        const roomData = roomSnap.data();
+        const results = await getElectionRoomById(roomId, { withVoteCounts: true });
+        
+        if (!results) {
+            return { success: false, message: "Could not retrieve current results." };
+        }
+        
+        let totalParticipants = 0;
+        const voters = await getVotersForRoom(roomId);
+        if (roomData.roomType === 'voting') {
+            totalParticipants = voters.filter(v => v.status === 'completed').length;
+        } else {
+            const maxReviews = Math.max(...(results.positions.map(p => p.reviews?.length || 0)), 0);
+            totalParticipants = maxReviews;
+        }
+
+        const finalizedResults = {
+            positions: results.positions.map(p => ({
+                ...p,
+                // The 'reviews' array already contains the necessary feedback, rating, etc.
+                // We just need to make sure we're saving the version from getElectionRoomById
+                reviews: p.reviews?.map(r => ({ rating: r.rating, feedback: r.feedback, reviewedAt: r.reviewedAt })) || [],
+            })),
+            totalParticipants: totalParticipants,
+            finalizedAt: new Date().toISOString(),
+        };
+
+        const batch = writeBatch(db);
+
+        // Update the main room document with finalized results
+        batch.update(roomRef, {
+            finalized: true,
+            finalizedResults: finalizedResults
+        });
+
+        // Delete all documents in the 'votes' subcollection
+        const votesColRef = collection(db, "electionRooms", roomId, "votes");
+        const votesSnap = await getDocs(votesColRef);
+        votesSnap.forEach(doc => batch.delete(doc.ref));
+        
+        // Delete all documents in the 'reviews' subcollection
+        const reviewsColRef = collection(db, "electionRooms", roomId, "reviews");
+        const reviewsSnap = await getDocs(reviewsColRef);
+        reviewsSnap.forEach(doc => batch.delete(doc.ref));
+
+        // Optionally, delete the 'voters' subcollection too for complete anonymity
+        const votersColRef = collection(db, "electionRooms", roomId, "voters");
+        voters.forEach(voter => {
+            batch.delete(doc(votersColRef, voter.email));
+        });
+
+        await batch.commit();
+
+        return { success: true, message: "Results have been finalized and all submission data has been permanently deleted." };
+
+    } catch (error: any) {
+        console.error("Finalization error:", error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            return { success: false, message: "Incorrect password. Finalization failed." };
+        }
+        if (error.code === 'auth/requires-recent-login') {
+            return { success: false, message: "This sensitive action requires a recent login. Please log out and back in." };
+        }
+        return { success: false, message: "An unexpected error occurred during finalization." };
+    }
 }

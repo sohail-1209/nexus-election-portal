@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { ElectionRoom } from "@/lib/types";
+import type { ElectionRoom, Position } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import StarRating from "@/components/app/StarRating";
 import { formatDistanceToNow } from "date-fns";
@@ -10,9 +10,10 @@ import { Eye, EyeOff } from "lucide-react";
 
 interface ReviewResultsDisplayProps {
   room: ElectionRoom;
+  positions: Position[];
 }
 
-export default function ReviewResultsDisplay({ room }: ReviewResultsDisplayProps) {
+export default function ReviewResultsDisplay({ room, positions }: ReviewResultsDisplayProps) {
   const [openFeedbackPositionId, setOpenFeedbackPositionId] = useState<string | null>(null);
 
   const toggleFeedbackVisibility = (positionId: string) => {
@@ -21,7 +22,7 @@ export default function ReviewResultsDisplay({ room }: ReviewResultsDisplayProps
   
   return (
     <div className="space-y-6">
-      {room.positions.map(position => {
+      {positions.map(position => {
         const totalReviews = position.reviews?.length || 0;
         const isFeedbackVisible = openFeedbackPositionId === position.id;
 
