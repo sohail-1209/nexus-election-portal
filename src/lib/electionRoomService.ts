@@ -7,8 +7,7 @@ import type { ElectionRoom, Voter, Review, Position, FinalizedResults, ElectionG
 
 export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
   const roomsCol = collection(db, "electionRooms");
-  // Updated query to exclude archived rooms from the main dashboard
-  const roomsQuery = query(roomsCol, where("status", "!=", "archived"), orderBy("status"), orderBy("createdAt", "desc"));
+  const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
   const roomsSnapshot = await getDocs(roomsQuery);
   const rooms = roomsSnapshot.docs.map(doc => {
     const data = doc.data();
@@ -28,61 +27,6 @@ export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom
 
   return { rooms };
 }
-
-export async function getArchivedRooms(): Promise<ElectionRoom[]> {
-  const roomsCol = collection(db, "electionRooms");
-  const roomsQuery = query(roomsCol, where("status", "==", "archived"), orderBy("createdAt", "desc"));
-  const roomsSnapshot = await getDocs(roomsQuery);
-  return roomsSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      title: data.title || "Untitled Election",
-      description: data.description || "No description provided.",
-      createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-      status: data.status,
-      roomType: data.roomType || 'voting',
-      // We don't need full position/candidate data for the archived list
-      positions: [],
-      isAccessRestricted: false,
-    } as ElectionRoom;
-  });
-}
-
-export async function archiveRoom(roomId: string, adminPassword: string): Promise<{ success: boolean; message: string }> {
-    const user = auth.currentUser;
-    if (!user || !user.email) {
-        return { success: false, message: "Authentication required. Please log in again." };
-    }
-
-    try {
-        const credential = EmailAuthProvider.credential(user.email, adminPassword);
-        await reauthenticateWithCredential(user, credential);
-        
-        const roomRef = doc(db, "electionRooms", roomId);
-        await updateDoc(roomRef, { status: "archived" });
-
-        return { success: true, message: "Room successfully archived." };
-    } catch (error: any) {
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            return { success: false, message: "Incorrect password. Archiving failed." };
-        }
-        console.error("Archive error:", error);
-        return { success: false, message: "An unexpected error occurred." };
-    }
-}
-
-export async function restoreRoom(roomId: string): Promise<{ success: boolean; message: string }> {
-    try {
-        const roomRef = doc(db, "electionRooms", roomId);
-        await updateDoc(roomRef, { status: "pending" });
-        return { success: true, message: "Room successfully restored." };
-    } catch (error: any) {
-        console.error("Restore error:", error);
-        return { success: false, message: "An unexpected error occurred during restoration." };
-    }
-}
-
 
 export async function getElectionRoomById(roomId: string, options: { withVoteCounts?: boolean } = {}): Promise<ElectionRoom | null> {
   const { withVoteCounts = false } = options;
@@ -504,3 +448,5 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         return { success: false, message: "An unexpected error occurred during finalization." };
     }
 }
+
+    

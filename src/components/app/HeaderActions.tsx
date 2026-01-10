@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell, Archive } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -90,12 +90,6 @@ export default function HeaderActions() {
                       <span>Change Password</span>
                   </Link>
               </DropdownMenuItem>
-               <DropdownMenuItem asChild>
-                  <Link href="/admin/archived">
-                      <Archive className="mr-2 h-4 w-4" />
-                      <span>Archived Rooms</span>
-                  </Link>
-              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />
@@ -108,3 +102,5 @@ export default function HeaderActions() {
     </>
   );
 }
+
+    

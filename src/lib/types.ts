@@ -39,7 +39,7 @@ export interface ElectionRoom {
   positions: Position[];
   createdAt: string;
   updatedAt?: string; // Added for Firestore timestamp
-  status: 'pending' | 'active' | 'closed' | 'archived';
+  status: 'pending' | 'active' | 'closed';
   roomType?: 'voting' | 'review';
   finalized?: boolean; // New flag to indicate if results are baked in
   finalizedResults?: FinalizedResults; // Stored static results
@@ -60,3 +60,5 @@ export interface ElectionGroup {
     roomCount: number;
     createdAt: string;
 }
+
+    
