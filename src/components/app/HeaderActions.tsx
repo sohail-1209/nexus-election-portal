@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -17,13 +18,14 @@ import { useRouter, usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { format } from "date-fns";
 
 export default function HeaderActions() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { hasNotifications, setHasNotifications } = useNotificationStore();
+  const { hasNotifications, setHasNotifications, triggerNotification } = useNotificationStore();
 
   const isAdminPage = pathname.startsWith('/admin');
 
@@ -32,8 +34,23 @@ export default function HeaderActions() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
+
+    // Check for calendar notifications on mount
+    try {
+      const savedNotesRaw = localStorage.getItem("calendarNotes");
+      if (savedNotesRaw) {
+        const savedNotes = JSON.parse(savedNotesRaw);
+        const todayString = format(new Date(), "yyyy-MM-dd");
+        if (savedNotes[todayString] && savedNotes[todayString].notify) {
+          triggerNotification();
+        }
+      }
+    } catch (error) {
+      console.error("Could not check calendar notifications:", error);
+    }
+    
     return () => unsubscribe();
-  }, []);
+  }, [triggerNotification]);
 
   const handleLogout = async () => {
     try {
@@ -48,7 +65,8 @@ export default function HeaderActions() {
     // Here you would typically open a notification panel/page
     // For now, we'll just clear the notification state
     setHasNotifications(false);
-    // You might want to router.push('/admin/notifications') or similar
+    // Redirect to calendar page to see the note
+    router.push('/admin/calendar');
   };
 
   return (
@@ -58,7 +76,8 @@ export default function HeaderActions() {
         <>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon" className="relative" onClick={handleNotificationClick}>
+                    {hasNotifications && <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5 rounded-full bg-destructive animate-ping" />}
                     {hasNotifications && <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5 rounded-full bg-destructive" />}
                     <Bell className="h-5 w-5" />
                     <span className="sr-only">Notifications</span>
@@ -67,8 +86,8 @@ export default function HeaderActions() {
             <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setHasNotifications(false)}>
-                    {hasNotifications ? "You have new updates." : "No new notifications."}
+                <DropdownMenuItem onClick={handleNotificationClick} className="cursor-pointer">
+                    {hasNotifications ? "You have a reminder for today!" : "No new notifications."}
                 </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
