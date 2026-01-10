@@ -85,13 +85,11 @@ function RoomCard({ room, onRoomDeleted }: { room: ElectionRoom; onRoomDeleted: 
                  <div className="flex justify-between items-start gap-4">
                     <CardTitle className="text-lg font-headline mb-1 line-clamp-2 flex-grow">{room.title}</CardTitle>
                     <div className="flex-shrink-0 flex items-center gap-2">
+                        <StatusBadge status={room.status} />
                         <RoomTypeBadge type={room.roomType} />
                     </div>
                 </div>
                 <CardDescription className="text-sm line-clamp-3 pt-1">{room.description}</CardDescription>
-                 <div className="flex items-center gap-2 pt-2">
-                    <StatusBadge status={room.status} />
-                </div>
             </CardHeader>
             <CardContent className="flex-grow space-y-2 text-sm text-muted-foreground">
                 <div className="flex items-center">
