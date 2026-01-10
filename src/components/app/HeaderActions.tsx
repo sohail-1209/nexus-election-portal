@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Archive } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -85,6 +85,18 @@ export default function HeaderActions() {
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
+                  <Link href="/admin/calendar">
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      <span>Calendar</span>
+                  </Link>
+              </DropdownMenuItem>
+               <DropdownMenuItem asChild>
+                  <Link href="/admin/archived">
+                      <Archive className="mr-2 h-4 w-4" />
+                      <span>Archived Rooms</span>
+                  </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
                   <Link href="/admin/change-password">
                       <LockKeyhole className="mr-2 h-4 w-4" />
                       <span>Change Password</span>
@@ -102,5 +114,3 @@ export default function HeaderActions() {
     </>
   );
 }
-
-    
