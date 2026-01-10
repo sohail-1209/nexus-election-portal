@@ -20,24 +20,25 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 function DashboardSkeleton() {
   return (
     <div className="space-y-8">
-      <div className="flex justify-center">
-        <Skeleton className="h-10 w-56" />
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3, 4, 5, 6].map(i => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-4 w-1/2 mt-2" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {[1, 2].map(i => (
+          <Card key={i} className="h-[70vh]">
+            <CardHeader className="flex flex-row justify-between items-center">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-9 w-32" />
             </CardHeader>
-            <CardContent>
-              <Skeleton className="h-4 w-full mb-2" />
-              <Skeleton className="h-4 w-2/3" />
+            <CardContent className="space-y-6">
+              <Card>
+                <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
+                <CardContent><Skeleton className="h-4 w-full" /></CardContent>
+                <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
+              </Card>
+               <Card>
+                <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
+                <CardContent><Skeleton className="h-4 w-full" /></CardContent>
+                <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
+              </Card>
             </CardContent>
-            <CardFooter className="grid grid-cols-2 gap-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </CardFooter>
           </Card>
         ))}
       </div>
@@ -181,28 +182,24 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)]">
-      <div className="flex-shrink-0 space-y-4 pb-6">
-        <div className="text-center">
-            <h1 className="text-3xl font-bold font-headline">Election Dashboard</h1>
-            <p className="text-muted-foreground mt-2">Manage your election rooms.</p>
-        </div>
-      </div>
-      
-      {electionRooms.length > 0 ? (
-        <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
+    <div className="flex flex-col h-[calc(100vh-100px)]">
+      <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
+          {/* Voting Rooms Column */}
           <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
               <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground font-semibold">VOTING ROOMS</p>
+                  <div>
+                      <h2 className="text-lg font-semibold">Voting Rooms</h2>
+                      <p className="text-sm text-muted-foreground">Create and manage standard elections.</p>
+                  </div>
                   <Button asChild size="sm">
                     <Link href="/admin/rooms/create">
                         <PlusCircle /> Create New
                     </Link>
                   </Button>
               </div>
-              <ScrollArea className="flex-grow">
+              <ScrollArea className="flex-grow -mx-4 px-4">
                 {votingRooms.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-6 pr-4">
+                  <div className="grid grid-cols-1 gap-6 pr-1">
                       {votingRooms.map(room => (
                           <RoomCard key={room.id} room={room} onRoomDeleted={fetchData} />
                       ))}
@@ -213,18 +210,22 @@ export default function AdminDashboardPage() {
               </ScrollArea>
           </div>
           
-          <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground font-semibold">REVIEW & RATING ROOMS</p>
+           {/* Review Rooms Column */}
+          <div className="flex flex-col min-h-0 rounded-lg border-purple-500/50 border bg-card/50 p-4 space-y-4">
+               <div className="flex justify-between items-center">
+                   <div>
+                       <h2 className="text-lg font-semibold">Review & Rating Rooms</h2>
+                       <p className="text-sm text-muted-foreground">Gather feedback and ratings.</p>
+                   </div>
                   <Button asChild variant="secondary" size="sm">
                     <Link href="/admin/rooms/create-review">
                         <PlusCircle /> Create New
                     </Link>
                   </Button>
               </div>
-              <ScrollArea className="flex-grow">
+              <ScrollArea className="flex-grow -mx-4 px-4">
                   {reviewRooms.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6 pr-4">
+                    <div className="grid grid-cols-1 gap-6 pr-1">
                         {reviewRooms.map(room => (
                             <RoomCard key={room.id} room={room} onRoomDeleted={fetchData} />
                         ))}
@@ -235,32 +236,6 @@ export default function AdminDashboardPage() {
               </ScrollArea>
           </div>
         </div>
-      ) : (
-         <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
-            <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
-               <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground font-semibold">VOTING ROOMS</p>
-                  <Button asChild size="sm">
-                    <Link href="/admin/rooms/create">
-                        <PlusCircle /> Create New
-                    </Link>
-                  </Button>
-              </div>
-              <div className="text-center text-muted-foreground py-10 flex-grow flex items-center justify-center">No voting rooms created yet.</div>
-            </div>
-            <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
-               <div className="flex justify-between items-center">
-                  <p className="text-sm text-muted-foreground font-semibold">REVIEW & RATING ROOMS</p>
-                  <Button asChild variant="secondary" size="sm">
-                    <Link href="/admin/rooms/create-review">
-                        <PlusCircle /> Create New
-                    </Link>
-                  </Button>
-              </div>
-              <div className="text-center text-muted-foreground py-10 flex-grow flex items-center justify-center">No review rooms created yet.</div>
-            </div>
-        </div>
-      )}
     </div>
   );
 }
