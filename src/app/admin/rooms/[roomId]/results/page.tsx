@@ -197,18 +197,13 @@ export default function ElectionResultsPage() {
 
   const finalPositions = useMemo(() => {
       if (!room || !room.positions) return [];
-
-      // Create a deep copy to avoid mutating the original room state
+      
       const tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
       
-      // Apply the confirmed resolutions
       Object.entries(resolvedConflicts).forEach(([candidateId, chosenPositionId]) => {
           tempPositions.forEach(pos => {
-              // Find the candidate in this position
               const candidate = pos.candidates.find(cand => cand.id === candidateId);
-              // If the candidate exists in this position and this is NOT their chosen winning position
               if (candidate && pos.id !== chosenPositionId) {
-                  // Mark them as disqualified FOR THIS POSITION by setting vote count to -1
                   candidate.voteCount = -1;
               }
           });
@@ -219,7 +214,6 @@ export default function ElectionResultsPage() {
 
   const currentConflicts = useMemo(() => {
       if (room?.roomType === 'voting' && !room.finalized) {
-          // Calculate conflicts based on the current state of finalPositions
           const { conflicts } = calculateWinnersAndConflicts(finalPositions);
           return conflicts;
       }
@@ -457,5 +451,7 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
+
+    
 
     
