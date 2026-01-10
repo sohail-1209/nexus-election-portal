@@ -435,8 +435,7 @@ export default function ElectionResultsPage() {
           <AlertDescription>
             {conflictsExist ? "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
              : hasConfirmedResolutions ? "Conflicts resolved. You may now finalize the results."
-             : "This election is complete. Review the results, then resolve any conflicts to enable finalization."
-            }
+             : "This election is complete. Review the results, then resolve any conflicts to enable finalization."}
           </AlertDescription>
        </Alert>
      ) : null}
@@ -463,5 +462,3 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
-
-    
