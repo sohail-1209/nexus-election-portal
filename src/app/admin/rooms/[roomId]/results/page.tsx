@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -102,6 +103,7 @@ export default function ElectionResultsPage() {
   const fetchRoomData = useCallback(async () => {
     if (!roomId) return;
     try {
+      setLoading(true);
       // Always fetch with vote counts to ensure data is fresh
       const roomData = await getElectionRoomById(roomId, { withVoteCounts: true });
       if (!roomData) {
@@ -112,9 +114,9 @@ export default function ElectionResultsPage() {
 
       // If the room isn't finalized, fetch voter count separately
       if (!roomData.finalized) {
+        const voters = await getVotersForRoom(roomId);
+        const completedVoters = voters.filter(v => v.status === 'completed');
         if (roomData.roomType !== 'review') {
-          const voters = await getVotersForRoom(roomId);
-          const completedVoters = voters.filter(v => v.status === 'completed');
           setTotalCompletedVoters(completedVoters.length);
         } else {
             // For review rooms, the total is the number of reviews on the most reviewed position
@@ -316,7 +318,7 @@ export default function ElectionResultsPage() {
             )}
             <Button disabled={isExporting} className="w-full sm:w-auto" onClick={handleExportMarkdown}>
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                {isExporting ? 'Exporting...' : 'Export as .md Code'}
+                {isExporting ? 'Exporting...' : 'Export as .md'}
             </Button>
             {!room.finalized && (
               <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />

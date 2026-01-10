@@ -1,3 +1,4 @@
+
 export interface Candidate {
   id: string;
   name: string;
@@ -9,7 +10,7 @@ export interface Candidate {
 export interface Review {
   rating: number;
   feedback: string;
-  reviewerEmail: string; // This will only exist on live data, not finalized data
+  reviewerEmail?: string; // This will only exist on live data, not finalized data
   reviewedAt: string;
 }
 
@@ -42,6 +43,7 @@ export interface ElectionRoom {
   roomType?: 'voting' | 'review';
   finalized?: boolean; // New flag to indicate if results are baked in
   finalizedResults?: FinalizedResults; // Stored static results
+  groupId?: string | null;
 }
 
 export interface Voter {
@@ -50,4 +52,11 @@ export interface Voter {
   lastActivity?: string;
   votedAt?: string;
   ownPositionTitle?: string;
+}
+
+export interface ElectionGroup {
+    id: string;
+    name: string;
+    roomCount: number;
+    createdAt: string;
 }

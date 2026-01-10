@@ -1,24 +1,17 @@
+
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, FinalizedResults, ElectionGroup } from '@/lib/types';
 
 
-export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
+export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[], groups: ElectionGroup[] }> {
   const roomsCol = collection(db, "electionRooms");
-  const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
-
+  // Fetch only rooms that are not part of any group
+  const roomsQuery = query(roomsCol, where("groupId", "==", null), orderBy("createdAt", "desc"));
   const roomsSnapshot = await getDocs(roomsQuery);
-
   const rooms = roomsSnapshot.docs.map(doc => {
     const data = doc.data();
-    const createdAtRaw = data.createdAt;
-    const createdAt = createdAtRaw instanceof Timestamp
-      ? createdAtRaw.toDate().toISOString()
-      : typeof createdAtRaw === 'string'
-      ? createdAtRaw 
-      : new Date().toISOString(); 
-
     return {
       id: doc.id,
       title: data.title || "Untitled Election",
@@ -26,14 +19,28 @@ export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom
       isAccessRestricted: data.isAccessRestricted === true,
       accessCode: data.accessCode || undefined,
       positions: data.positions || [],
-      createdAt: createdAt,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate().toISOString() : undefined,
+      createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+      updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString(),
       status: data.status || 'pending',
       roomType: data.roomType || 'voting',
     } as ElectionRoom;
   });
 
-  return { rooms };
+  const groupsCol = collection(db, "groups");
+  const groupsQuery = query(groupsCol, orderBy("createdAt", "desc"));
+  const groupsSnapshot = await getDocs(groupsQuery);
+  const groups = groupsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+          id: doc.id,
+          name: data.name,
+          roomCount: data.roomCount || 0,
+          createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+      } as ElectionGroup
+  });
+
+
+  return { rooms, groups };
 }
 
 
@@ -172,6 +179,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     status: (data.status as ElectionRoom['status']) || 'pending',
     roomType: data.roomType || 'voting',
     finalized: data.finalized || false,
+    groupId: data.groupId || null,
   };
 }
 
@@ -199,37 +207,6 @@ export async function getVotersForRoom(roomId: string): Promise<Voter[]> {
   });
   
   return voters;
-}
-
-export async function deleteElectionRoom(roomId: string, adminPassword: string): Promise<{ success: boolean; message: string }> {
-    const roomRef = doc(db, "electionRooms", roomId);
-    const user = auth.currentUser;
-
-    if (!user || !user.email) {
-        return { success: false, message: "No authenticated user found. Please log in again." };
-    }
-    
-    try {
-        const credential = EmailAuthProvider.credential(user.email, adminPassword);
-        await reauthenticateWithCredential(user, credential);
-        
-        await deleteDoc(roomRef);
-        
-        return { success: true, message: "Voting room successfully deleted." };
-
-    } catch (error: any) {
-        console.error("Error deleting room:", error);
-        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            return { success: false, message: "Incorrect password. Deletion failed." };
-        }
-        if (error.code === 'auth/requires-recent-login') {
-            return { success: false, message: "This action is sensitive and requires a recent login. Please log out and log back in." };
-        }
-        if (error.code === 'permission-denied') {
-            return { success: false, message: "You do not have permission to delete this room." };
-        }
-        return { success: false, message: "An unexpected error occurred while deleting the room." };
-    }
 }
 
 export async function recordParticipantEntry(
@@ -402,6 +379,9 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         if (!roomSnap.exists()) {
             return { success: false, message: "Room not found." };
         }
+        if (roomSnap.data().finalized) {
+            return { success: false, message: "This room has already been finalized." };
+        }
 
         const roomData = roomSnap.data();
         const results = await getElectionRoomById(roomId, { withVoteCounts: true });
@@ -412,19 +392,32 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         
         let totalParticipants = 0;
         const voters = await getVotersForRoom(roomId);
+        const completedVoters = voters.filter(v => v.status === 'completed');
+
         if (roomData.roomType === 'voting') {
-            totalParticipants = voters.filter(v => v.status === 'completed').length;
-        } else {
+            totalParticipants = completedVoters.length;
+        } else { // review room
             const maxReviews = Math.max(...(results.positions.map(p => p.reviews?.length || 0)), 0);
             totalParticipants = maxReviews;
         }
 
-        const finalizedResults = {
+        const finalizedResults: FinalizedResults = {
             positions: results.positions.map(p => ({
-                ...p,
-                // The 'reviews' array already contains the necessary feedback, rating, etc.
-                // We just need to make sure we're saving the version from getElectionRoomById
-                reviews: p.reviews?.map(r => ({ rating: r.rating, feedback: r.feedback, reviewedAt: r.reviewedAt })) || [],
+                id: p.id,
+                title: p.title,
+                candidates: p.candidates.map(c => ({
+                  id: c.id,
+                  name: c.name,
+                  imageUrl: c.imageUrl,
+                  voteCount: c.voteCount,
+                })),
+                reviews: p.reviews?.map(r => ({ 
+                    rating: r.rating, 
+                    feedback: r.feedback, 
+                    reviewedAt: r.reviewedAt 
+                })) || [],
+                averageRating: p.averageRating,
+                ratingDistribution: p.ratingDistribution,
             })),
             totalParticipants: totalParticipants,
             finalizedAt: new Date().toISOString(),
@@ -448,7 +441,7 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         const reviewsSnap = await getDocs(reviewsColRef);
         reviewsSnap.forEach(doc => batch.delete(doc.ref));
 
-        // Optionally, delete the 'voters' subcollection too for complete anonymity
+        // Delete the 'voters' subcollection documents for complete anonymity
         const votersColRef = collection(db, "electionRooms", roomId, "voters");
         voters.forEach(voter => {
             batch.delete(doc(votersColRef, voter.email));

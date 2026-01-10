@@ -1,3 +1,4 @@
+
 import type { Position } from "@/lib/types";
 import {
   Table,
@@ -78,7 +79,7 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
                 })}
                 {sortedCandidates.length === 0 && (
                     <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground h-24">No candidates or votes for this position.</TableCell>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground h-24">No candidates for this position.</TableCell>
                     </TableRow>
                 )}
               </TableBody>

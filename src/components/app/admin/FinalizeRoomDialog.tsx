@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -53,7 +54,13 @@ export default function FinalizeRoomDialog({ roomId, onFinalized }: FinalizeRoom
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+        if (!isOpen) {
+            setPassword("");
+            setIsLoading(false);
+        }
+    }}>
       <DialogTrigger asChild>
         <Button variant="destructive">
           <ShieldAlert className="mr-2 h-4 w-4" />

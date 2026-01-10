@@ -139,6 +139,7 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
       positions: firestoreReadyPositions,
       roomType: initialData?.roomType || 'voting',
       status: values.status || 'pending',
+      groupId: initialData?.groupId || null,
     };
     
     try {
