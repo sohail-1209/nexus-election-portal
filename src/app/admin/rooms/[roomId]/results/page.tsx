@@ -213,7 +213,7 @@ export default function ElectionResultsPage() {
   }, [room, resolvedConflicts]);
 
   const currentConflicts = useMemo(() => {
-      if (room?.roomType === 'voting' && !room.finalized) {
+      if (room?.roomType === 'voting' && room.status === 'closed' && !room.finalized) {
           const { conflicts } = calculateWinnersAndConflicts(finalPositions);
           return conflicts;
       }
@@ -336,7 +336,7 @@ export default function ElectionResultsPage() {
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
   const conflictsExist = currentConflicts.length > 0;
-  const canFinalize = room.status === 'closed' && !room.finalized && hasConfirmedResolutions && !conflictsExist;
+  const canFinalize = room.status === 'closed' && !room.finalized && (!conflictsExist || hasConfirmedResolutions);
 
   
   const renderResults = () => {
@@ -403,7 +403,7 @@ export default function ElectionResultsPage() {
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                 {isExporting ? 'Exporting...' : 'Export as .md'}
             </Button>
-            {canFinalize && (
+            {canFinalize && !conflictsExist && (
               <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />
             )}
         </div>
@@ -424,7 +424,7 @@ export default function ElectionResultsPage() {
           <AlertDescription>
             {conflictsExist ? "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
              : hasConfirmedResolutions ? "Conflicts resolved. You may now finalize the results."
-             : "This election is complete. Review the results, then click 'Apply Selections' (even if none) to enable finalization."}
+             : "This election is complete. Review the results, and if all looks correct, you may finalize."}
           </AlertDescription>
        </Alert>
      ) : null}
@@ -451,7 +451,5 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
-
-    
 
     
