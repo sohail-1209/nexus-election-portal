@@ -7,12 +7,11 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { getElectionRoomsAndGroups } from "@/lib/electionRoomService";
 import type { ElectionRoom } from "@/lib/types";
-import { useToast } from "@/hooks/use-toast";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, AlertTriangle, ArrowRight, CalendarDays, Settings, BarChart3, Users, LockKeyhole, PenSquare, Vote, Star } from "lucide-react";
+import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
@@ -188,13 +187,24 @@ export default function AdminDashboardPage() {
             <h1 className="text-3xl font-bold font-headline">Election Dashboard</h1>
             <p className="text-muted-foreground mt-2">Manage your election rooms.</p>
         </div>
+        <div className="flex justify-center gap-4">
+            <Button asChild>
+                <Link href="/admin/rooms/create">
+                    <PlusCircle /> Create Voting Room
+                </Link>
+            </Button>
+            <Button asChild variant="secondary">
+                <Link href="/admin/rooms/create-review">
+                    <PlusCircle /> Create Review Room
+                </Link>
+            </Button>
+        </div>
       </div>
       
       {electionRooms.length > 0 ? (
         <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
           {/* Voting Rooms Column */}
           <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
-              <h2 className="text-2xl font-semibold font-headline text-center mb-4 flex-shrink-0">Voting Rooms</h2>
               <ScrollArea className="flex-grow">
                 {votingRooms.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-1 gap-6 pr-4">
@@ -210,7 +220,6 @@ export default function AdminDashboardPage() {
           
           {/* Review Rooms Column */}
           <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
-              <h2 className="text-2xl font-semibold font-headline text-center mb-4 flex-shrink-0">Review & Rating Rooms</h2>
               <ScrollArea className="flex-grow">
                   {reviewRooms.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-1 gap-6 pr-4">
@@ -235,3 +244,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    
