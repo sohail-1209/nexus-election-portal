@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
           <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
               <ScrollArea className="flex-grow">
                 {votingRooms.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 gap-6 pr-4">
+                  <div className="grid grid-cols-1 gap-6 pr-4">
                       {votingRooms.map(room => (
                           <RoomCard key={room.id} room={room} onRoomDeleted={fetchData} />
                       ))}
@@ -220,7 +220,7 @@ export default function AdminDashboardPage() {
           <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
               <ScrollArea className="flex-grow">
                   {reviewRooms.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 xl:grid-cols-2 gap-6 pr-4">
+                    <div className="grid grid-cols-1 gap-6 pr-4">
                         {reviewRooms.map(room => (
                             <RoomCard key={room.id} room={room} onRoomDeleted={fetchData} />
                         ))}
@@ -242,5 +242,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    
