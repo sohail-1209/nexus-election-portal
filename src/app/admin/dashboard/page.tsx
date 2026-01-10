@@ -188,29 +188,16 @@ export default function AdminDashboardPage() {
             <h1 className="text-3xl font-bold font-headline">Election Dashboard</h1>
             <p className="text-muted-foreground mt-2">Manage your election rooms.</p>
         </div>
-
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-          <Button asChild>
-            <Link href="/admin/rooms/create">
-              <PlusCircle className="mr-2 h-5 w-5" /> Create New Voting Room
-            </Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/admin/rooms/create-review">
-              <PenSquare className="mr-2 h-5 w-5" /> Create New Review Room
-            </Link>
-          </Button>
-        </div>
       </div>
       
       {electionRooms.length > 0 ? (
         <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
           {/* Voting Rooms Column */}
-          <div className="flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
               <h2 className="text-2xl font-semibold font-headline text-center mb-4 flex-shrink-0">Voting Rooms</h2>
               <ScrollArea className="flex-grow">
                 {votingRooms.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-1 xl:grid-cols-2 gap-6 pr-4">
+                  <div className="grid grid-cols-1 md:grid-cols-1 gap-6 pr-4">
                       {votingRooms.map(room => (
                           <RoomCard key={room.id} room={room} />
                       ))}
@@ -222,11 +209,11 @@ export default function AdminDashboardPage() {
           </div>
           
           {/* Review Rooms Column */}
-          <div className="flex flex-col min-h-0">
+          <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
               <h2 className="text-2xl font-semibold font-headline text-center mb-4 flex-shrink-0">Review & Rating Rooms</h2>
               <ScrollArea className="flex-grow">
                   {reviewRooms.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-1 xl:grid-cols-2 gap-6 pr-4">
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-6 pr-4">
                         {reviewRooms.map(room => (
                             <RoomCard key={room.id} room={room} />
                         ))}
