@@ -88,10 +88,11 @@ const findWinners = (position: Position): Candidate[] => {
     if (!position.candidates || position.candidates.length === 0) {
         return [];
     }
-    const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-    const maxVotes = sortedCandidates[0]?.voteCount || 0;
-    if (maxVotes === 0) return [];
-    return sortedCandidates.filter(c => (c.voteCount || 0) === maxVotes);
+    const maxVotes = Math.max(...position.candidates.map(c => c.voteCount || 0));
+    if (maxVotes === 0) {
+        return [];
+    }
+    return position.candidates.filter(c => (c.voteCount || 0) === maxVotes);
 };
 
 export default function ElectionResultsPage() {
@@ -422,7 +423,11 @@ export default function ElectionResultsPage() {
             <ShieldAlert className="h-4 w-4 text-amber-600" />
             <AlertTitle>Ready to Finalize</AlertTitle>
             <AlertDescription>
-                This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible.
+                {conflictsResolved ? (
+                    "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
+                ) : (
+                    "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
+                )}
             </AlertDescription>
          </Alert>
        )}
@@ -448,5 +453,3 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
-
-    
