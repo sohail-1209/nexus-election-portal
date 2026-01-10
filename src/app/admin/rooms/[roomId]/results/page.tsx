@@ -155,6 +155,8 @@ export default function ElectionResultsPage() {
     if (!roomId) return;
     try {
       setLoading(true);
+      setHasConfirmedResolutions(false);
+      setResolvedConflicts({});
       const roomData = await getElectionRoomById(roomId, { withVoteCounts: true });
       if (!roomData) {
         notFound();
@@ -194,22 +196,24 @@ export default function ElectionResultsPage() {
   }, [roomId, router, fetchRoomData]);
 
   const finalPositions = useMemo(() => {
-    if (!room || !room.positions) return [];
-    if (!hasConfirmedResolutions) return room.positions;
+      if (!room || !room.positions) return [];
+      if (!hasConfirmedResolutions) return room.positions;
 
-    const tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
-    
-    Object.entries(resolvedConflicts).forEach(([candidateId, chosenPositionId]) => {
-        tempPositions.forEach(pos => {
-            pos.candidates.forEach(cand => {
-                if (cand.id === candidateId && pos.id !== chosenPositionId) {
-                    cand.voteCount = -1; // Mark as disqualified for this position
-                }
-            });
-        });
-    });
+      const tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
+      
+      Object.entries(resolvedConflicts).forEach(([candidateId, chosenPositionId]) => {
+          tempPositions.forEach(pos => {
+              // Find the candidate in this position
+              const candidate = pos.candidates.find(cand => cand.id === candidateId);
+              // If the candidate exists in this position and this is NOT their chosen winning position
+              if (candidate && pos.id !== chosenPositionId) {
+                  // Mark them as disqualified FOR THIS POSITION by setting vote count to -1
+                  candidate.voteCount = -1;
+              }
+          });
+      });
 
-    return tempPositions;
+      return tempPositions;
   }, [room, hasConfirmedResolutions, resolvedConflicts]);
 
   const currentConflicts = useMemo(() => {
@@ -335,7 +339,8 @@ export default function ElectionResultsPage() {
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
-  const canFinalize = room.status === 'closed' && !room.finalized && currentConflicts.length === 0;
+  const canFinalize = room.status === 'closed' && !room.finalized && currentConflicts.length === 0 && hasConfirmedResolutions;
+  const conflictsExist = currentConflicts.length > 0;
   
   const renderResults = () => {
     if (room.roomType === 'review') {
@@ -420,8 +425,9 @@ export default function ElectionResultsPage() {
           <ShieldAlert className="h-4 w-4 text-amber-600" />
           <AlertTitle>Ready to Finalize</AlertTitle>
           <AlertDescription>
-            {currentConflicts.length === 0 ? "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
-             : "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
+            {conflictsExist ? "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
+             : hasConfirmedResolutions ? "Conflicts resolved. You may now finalize the results."
+             : "This election is complete. Review the results, then resolve any conflicts to enable finalization."
             }
           </AlertDescription>
        </Alert>
@@ -440,7 +446,7 @@ export default function ElectionResultsPage() {
         </Card>
       )}
       
-      {currentConflicts.length > 0 && room.status === 'closed' && !room.finalized && (
+      {conflictsExist && room.status === 'closed' && !room.finalized && (
         <ConflictResolver conflicts={currentConflicts} onResolve={handleConfirmResolutions} />
       )}
 
@@ -449,3 +455,5 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
+
+    
