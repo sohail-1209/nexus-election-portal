@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell, CalendarDays } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2 } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -19,6 +19,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { format } from "date-fns";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 export default function HeaderActions() {
   const router = useRouter();
@@ -26,6 +29,7 @@ export default function HeaderActions() {
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
   const { hasNotifications, setHasNotifications, triggerNotification } = useNotificationStore();
+  const { enableDeletion, toggleDeletion } = useSettingsStore();
 
   const isAdminPage = pathname.startsWith('/admin');
 
@@ -62,10 +66,7 @@ export default function HeaderActions() {
   };
 
   const handleNotificationClick = () => {
-    // Here you would typically open a notification panel/page
-    // For now, we'll just clear the notification state
     setHasNotifications(false);
-    // Redirect to calendar page to see the note
     router.push('/admin/calendar');
   };
 
@@ -99,7 +100,7 @@ export default function HeaderActions() {
                 <span className="sr-only">Settings</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
@@ -114,6 +115,21 @@ export default function HeaderActions() {
                       <span>Change Password</span>
                   </Link>
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+               <DropdownMenuLabel>Settings</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                  <div className="flex w-full items-center justify-between">
+                    <Label htmlFor="delete-switch" className="flex items-center gap-2 font-normal cursor-pointer">
+                      <Trash2 className="h-4 w-4" />
+                      Enable Deletion
+                    </Label>
+                    <Switch
+                      id="delete-switch"
+                      checked={enableDeletion}
+                      onCheckedChange={toggleDeletion}
+                    />
+                  </div>
+                </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />

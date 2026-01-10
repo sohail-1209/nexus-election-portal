@@ -17,6 +17,7 @@ import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 function DashboardSkeleton() {
   return (
@@ -76,6 +77,8 @@ function RoomTypeBadge({ type }: { type: ElectionRoom['roomType'] }) {
 }
 
 function RoomCard({ room, onRoomDeleted }: { room: ElectionRoom; onRoomDeleted: () => void; }) {
+    const { enableDeletion } = useSettingsStore();
+
     return (
         <Card className="flex flex-col hover:shadow-xl transition-shadow duration-300">
             <CardHeader>
@@ -115,7 +118,7 @@ function RoomCard({ room, onRoomDeleted }: { room: ElectionRoom; onRoomDeleted: 
                     </Link>
                 </Button>
                 <div className="col-span-2">
-                    <DeleteRoomDialog roomId={room.id} roomTitle={room.title} onRoomDeleted={onRoomDeleted} />
+                   {enableDeletion && <DeleteRoomDialog roomId={room.id} roomTitle={room.title} onRoomDeleted={onRoomDeleted} />}
                 </div>
             </CardFooter>
         </Card>
