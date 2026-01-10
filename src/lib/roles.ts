@@ -30,5 +30,6 @@ export const generalClubRoles = [
     "Logistics Team", 
     "Technical Team", 
     "Networking and Collaboration Team", 
-    "Member"
+    "Member",
+    "Other"
 ];

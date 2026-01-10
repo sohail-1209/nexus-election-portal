@@ -41,6 +41,7 @@ const candidateSchema = z.object({
 const positionSchema = z.object({
   id: z.string().optional(), 
   title: z.string().min(1, "Position title is required."),
+  customTitle: z.string().optional(),
   candidates: z.array(candidateSchema).min(1, "At least one candidate is required for a position."),
 });
 
@@ -50,12 +51,22 @@ const electionRoomFormSchema = z.object({
   positions: z.array(positionSchema).min(1, "At least one position is required."),
   status: z.enum(["pending", "active", "closed"]).optional(),
 }).refine(data => {
-    const titles = data.positions.map(p => p.title.toLowerCase().trim());
-    const uniqueTitles = new Set(titles);
-    return uniqueTitles.size === titles.length;
+    const titles = data.positions.map(p => (p.title === 'Other' ? p.customTitle || '' : p.title).toLowerCase().trim());
+    const uniqueTitles = new Set(titles.filter(t => t)); // Filter out empty custom titles
+    return uniqueTitles.size === titles.filter(t => t).length;
 }, {
     message: "Each position must be unique.",
     path: ["positions"],
+}).refine(data => {
+    return data.positions.every(p => {
+        if (p.title === 'Other') {
+            return p.customTitle && p.customTitle.trim().length > 0;
+        }
+        return true;
+    });
+}, {
+    message: "Custom position title is required when 'Other' is selected.",
+    path: ['positions']
 });
 
 
@@ -73,6 +84,7 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isFormMounted, setIsFormMounted] = useState(false);
+  const allElectionRoles = [...facultyRoles, ...clubAuthorities, ...clubOperationTeam, ...generalClubRoles];
 
   const form = useForm<ElectionRoomFormValues>({
     resolver: zodResolver(electionRoomFormSchema),
@@ -80,16 +92,20 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
       title: initialData.title || "",
       description: initialData.description || "",
       status: initialData.status || "pending",
-      positions: (initialData.positions || []).map(p => ({
-        id: p.id,
-        title: p.title || "",
-        candidates: (p.candidates || []).map(c => ({
-          id: c.id,
-          name: c.name || "",
-          imageUrl: c.imageUrl || "",
-          voteCount: c.voteCount || 0,
-        })),
-      })),
+      positions: (initialData.positions || []).map(p => {
+        const isCustom = !allElectionRoles.includes(p.title);
+        return {
+            id: p.id,
+            title: isCustom ? 'Other' : p.title || "",
+            customTitle: isCustom ? p.title : "",
+            candidates: (p.candidates || []).map(c => ({
+              id: c.id,
+              name: c.name || "",
+              imageUrl: c.imageUrl || "",
+              voteCount: c.voteCount || 0,
+            })),
+        }
+      }),
     } : {
       title: "",
       description: "",
@@ -109,6 +125,7 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
       appendPosition({
         id: generateClientSideId('pos'),
         title: "",
+        customTitle: "",
         candidates: [{
           id: generateClientSideId('cand'),
           name: "",
@@ -123,7 +140,7 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
 
     const firestoreReadyPositions = values.positions.map(p => ({
         id: p.id || generateClientSideId('pos'),
-        title: p.title,
+        title: p.title === 'Other' ? p.customTitle!.trim() : p.title,
         candidates: p.candidates.map(c => ({
             id: c.id || generateClientSideId('cand'),
             name: c.name,
@@ -272,7 +289,8 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
             variant="outline"
             onClick={() => appendPosition({ 
                 id: generateClientSideId('pos'), 
-                title: "", 
+                title: "",
+                customTitle: "",
                 candidates: [{ 
                     id: generateClientSideId('cand'), 
                     name: "", 
@@ -316,8 +334,9 @@ interface PositionCardProps {
 }
 
 function PositionCard({ positionIndex, removePosition, form, initialData, isOnlyPosition }: PositionCardProps) {
-  const { control } = form;
+  const { control, watch } = form;
   const allElectionRoles = [...facultyRoles, ...clubAuthorities, ...clubOperationTeam, ...generalClubRoles];
+  const positionTitleValue = watch(`positions.${positionIndex}.title`);
 
   return (
      <Card className="relative group/position">
@@ -342,28 +361,45 @@ function PositionCard({ positionIndex, removePosition, form, initialData, isOnly
         </div>
       </CardHeader>
       <CardContent className="p-4 space-y-4">
-        <FormField
-          control={control}
-          name={`positions.${positionIndex}.title`}
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Position Title</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a position title" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {allElectionRoles.map(role => (
-                      <SelectItem key={role} value={role}>{role}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="space-y-4">
+            <FormField
+              control={control}
+              name={`positions.${positionIndex}.title`}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Position Title</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a position title" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {allElectionRoles.map(role => (
+                          <SelectItem key={role} value={role}>{role}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {positionTitleValue === 'Other' && (
+                <FormField
+                  control={control}
+                  name={`positions.${positionIndex}.customTitle`}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Custom Position Title</FormLabel>
+                       <FormControl>
+                          <Input placeholder="Enter custom title" {...field} />
+                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            )}
+        </div>
         <CandidateFields 
           positionIndex={positionIndex} 
           control={form.control}

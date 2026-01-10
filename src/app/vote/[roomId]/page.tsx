@@ -216,10 +216,12 @@ const GuidelinesScreen = ({
   onStart: (email: string, ownPositionTitle: string) => void
 }) => {
     const [email, setEmail] = useState("");
-    const [ownPositionTitle, setOwnPositionTitle] = useState("");
+    const [positionRole, setPositionRole] = useState("");
+    const [customPositionRole, setCustomPositionRole] = useState("");
     const [isEmailValid, setIsEmailValid] = useState(false);
     const [rulesAcknowledged, setRulesAcknowledged] = useState(false);
     
+    const ownPositionTitle = positionRole === 'Other' ? customPositionRole : positionRole;
     const canProceed = isEmailValid && rulesAcknowledged && ownPositionTitle;
 
     const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -248,7 +250,6 @@ const GuidelinesScreen = ({
                                <ul className="list-disc pl-5 space-y-1">
                                   <li>Only authorized members are allowed. Your access is granted based on your email.</li>
                                   <li>For 'Club Authorities' and 'Operation Team' roles, you can enter the room only once. Refreshing or exiting after starting may lock your session.</li>
-                                  <li>To avoid self-voting, if your own position is on the ballot, it will be excluded from your view.</li>
                                   <li>Maintain honesty and neutrality. Sharing or discussing your selections is prohibited.</li>
                                   <li>Once submitted, no changes can be made. Ensure you have a stable internet connection.</li>
                                </ul>
@@ -304,7 +305,7 @@ const GuidelinesScreen = ({
 
                 <div className="space-y-2">
                     <Label htmlFor="voter-position">Select Your Position/Role</Label>
-                    <Select value={ownPositionTitle} onValueChange={setOwnPositionTitle}>
+                    <Select value={positionRole} onValueChange={setPositionRole}>
                         <SelectTrigger id="voter-position" className="w-full">
                             <SelectValue placeholder="Select your current position or role..." />
                         </SelectTrigger>
@@ -334,7 +335,19 @@ const GuidelinesScreen = ({
                            </SelectGroup>
                         </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">This is to prevent you from voting for your own position.</p>
+                    {positionRole === 'Other' && (
+                        <div className="pl-2 pt-2">
+                             <Label htmlFor="custom-voter-position">Specify Your Role</Label>
+                             <Input 
+                                id="custom-voter-position"
+                                placeholder="e.g., Alumni Advisor"
+                                value={customPositionRole}
+                                onChange={(e) => setCustomPositionRole(e.target.value)}
+                                className="mt-1"
+                             />
+                        </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">This is to prevent you from voting/reviewing your own position.</p>
                 </div>
 
 
@@ -738,5 +751,3 @@ export default function VotingPage() {
     </div>
   );
 }
-
-    
