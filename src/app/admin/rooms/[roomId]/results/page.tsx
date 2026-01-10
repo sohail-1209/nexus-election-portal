@@ -197,10 +197,13 @@ export default function ElectionResultsPage() {
 
   const finalPositions = useMemo(() => {
       if (!room || !room.positions) return [];
+      // If resolutions haven't been confirmed, show original data
       if (!hasConfirmedResolutions) return room.positions;
 
+      // Create a deep copy to avoid mutating the original room state
       const tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
       
+      // Apply the confirmed resolutions
       Object.entries(resolvedConflicts).forEach(([candidateId, chosenPositionId]) => {
           tempPositions.forEach(pos => {
               // Find the candidate in this position
@@ -218,6 +221,7 @@ export default function ElectionResultsPage() {
 
   const currentConflicts = useMemo(() => {
       if (room?.roomType === 'voting' && !room.finalized) {
+          // Calculate conflicts based on the current state of finalPositions
           const { conflicts } = calculateWinnersAndConflicts(finalPositions);
           return conflicts;
       }
@@ -339,8 +343,12 @@ export default function ElectionResultsPage() {
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
-  const canFinalize = room.status === 'closed' && !room.finalized && currentConflicts.length === 0 && hasConfirmedResolutions;
   const conflictsExist = currentConflicts.length > 0;
+  // A room can be finalized if its status is 'closed', it's not already finalized, AND either:
+  // 1. There are no conflicts and resolutions have been "confirmed" (even if there was nothing to resolve)
+  // 2. There were conflicts, they have been resolved, and no new conflicts have arisen.
+  const canFinalize = room.status === 'closed' && !room.finalized && hasConfirmedResolutions && !conflictsExist;
+
   
   const renderResults = () => {
     if (room.roomType === 'review') {
