@@ -2,16 +2,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format } from "date-fns";
+import { format, getMonth, getYear, startOfMonth } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Save, Bell, Trash2, BellRing } from "lucide-react";
+import { CalendarDays, Save, Bell, Trash2, BellRing, PartyPopper } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useNotificationStore } from "@/stores/notificationStore";
+import holidays from '@/lib/holidays.json';
 
 type Note = {
   text: string;
@@ -22,8 +23,19 @@ type NotesStore = {
   [date: string]: Note;
 };
 
+type Holiday = {
+    date: string;
+    name: string;
+}
+
+const holidaysByDate: Record<string, Holiday> = holidays.reduce((acc, h) => {
+    acc[h.date] = h;
+    return acc;
+}, {} as Record<string, Holiday>);
+
 export default function CalendarPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [notes, setNotes] = useState<NotesStore>({});
   const [notify, setNotify] = useState(false);
   const { toast } = useToast();
@@ -31,7 +43,6 @@ export default function CalendarPage() {
 
   const selectedDateString = date ? format(date, "yyyy-MM-dd") : "";
 
-  // Load notes from local storage on component mount
   useEffect(() => {
     try {
       const savedNotes = localStorage.getItem("calendarNotes");
@@ -43,7 +54,6 @@ export default function CalendarPage() {
     }
   }, []);
   
-  // Update form when a new date is selected
   useEffect(() => {
     if (date) {
         const selectedNote = notes[selectedDateString];
@@ -108,41 +118,59 @@ export default function CalendarPage() {
     }
   };
   
-  const sortedSavedNotes = Object.entries(notes)
-    .filter(([_, note]) => note.text)
+  const monthlyNotes = Object.entries(notes)
+    .filter(([dateString, note]) => {
+        const noteDate = new Date(dateString);
+        return note.text && getYear(noteDate) === getYear(currentMonth) && getMonth(noteDate) === getMonth(currentMonth);
+    })
     .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
 
+  const monthlyHolidays = holidays.filter(h => {
+    const holidayDate = new Date(h.date);
+    return getYear(holidayDate) === getYear(currentMonth) && getMonth(holidayDate) === getMonth(currentMonth);
+  });
+
+  const holidayDateStrings = holidays.map(h => h.date);
 
   return (
     <div className="space-y-8">
-       <div className="text-center">
-        <h1 className="text-3xl font-bold font-headline flex items-center justify-center gap-3">
-          <CalendarDays className="h-8 w-8" />
-          Calendar & Notes
-        </h1>
-        <p className="text-muted-foreground mt-2">Select a date to view or add notes and reminders.</p>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="lg:col-span-1">
             <Card className="shadow-xl">
                  <CardContent className="p-0 flex justify-center">
                     <Calendar
                         mode="single"
                         selected={date}
                         onSelect={setDate}
-                        className="rounded-md"
+                        month={currentMonth}
+                        onMonthChange={setCurrentMonth}
+                        className="rounded-md w-full"
+                        modifiers={{
+                           holiday: (day) => holidayDateStrings.includes(format(day, 'yyyy-MM-dd'))
+                        }}
+                        modifiersClassNames={{
+                           holiday: "border-primary/50 border-2 rounded-full text-primary"
+                        }}
                         classNames={{
+                            months: "w-full",
+                            month: "w-full space-y-6",
+                            caption: "flex justify-center pt-2 relative items-center text-xl",
+                            table: "w-full border-collapse space-y-2",
+                            head_row: "flex justify-between",
+                            head_cell: "text-muted-foreground rounded-md w-12 font-normal text-md",
+                            row: "flex w-full mt-2 justify-between",
+                            cell: "h-12 w-12 text-center text-md p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                            day: "h-12 w-12 p-0 font-normal aria-selected:opacity-100",
                             day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary focus:text-primary-foreground",
-                            today: "bg-accent/50 text-accent-foreground",
-                            caption: "flex justify-center pt-1 relative items-center text-lg",
-                            root: "w-full"
+                            day_today: "bg-accent text-accent-foreground rounded-full",
+                            root: "w-full p-4",
                         }}
                     />
                 </CardContent>
             </Card>
         </div>
         
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-1 space-y-8">
           <Card className="shadow-xl sticky top-24">
             <CardHeader>
               <CardTitle>Notes & Reminders</CardTitle>
@@ -171,17 +199,38 @@ export default function CalendarPage() {
               </div>
             </CardContent>
           </Card>
+           <Card className="shadow-xl">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-xl">
+                        <PartyPopper className="text-primary" /> Holidays for {format(currentMonth, "MMMM yyyy")}
+                    </CardTitle>
+                </CardHeader>
+                <CardContent>
+                     {monthlyHolidays.length > 0 ? (
+                        <div className="space-y-2">
+                            {monthlyHolidays.map(holiday => (
+                                <div key={holiday.date} className="flex items-center gap-4 text-sm">
+                                    <span className="font-semibold">{format(new Date(holiday.date), "do")}</span>
+                                    <span>{holiday.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">No holidays this month.</p>
+                    )}
+                </CardContent>
+            </Card>
         </div>
       </div>
        <Card className="shadow-xl">
             <CardHeader>
-                <CardTitle>Saved Notes</CardTitle>
-                <CardDescription>All your upcoming notes and reminders at a glance.</CardDescription>
+                <CardTitle>Saved Notes for {format(currentMonth, "MMMM yyyy")}</CardTitle>
+                <CardDescription>All your notes and reminders for the selected month.</CardDescription>
             </CardHeader>
             <CardContent>
-                {sortedSavedNotes.length > 0 ? (
+                {monthlyNotes.length > 0 ? (
                     <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        {sortedSavedNotes.map(([dateString, note]) => (
+                        {monthlyNotes.map(([dateString, note]) => (
                             <div key={dateString} className="flex justify-between items-start p-3 rounded-lg border bg-muted/30">
                                 <div>
                                     <p className="font-semibold">{format(new Date(dateString), "PPP")}</p>
@@ -197,10 +246,12 @@ export default function CalendarPage() {
                         ))}
                     </div>
                 ) : (
-                    <p className="text-muted-foreground text-center py-8">No notes saved yet.</p>
+                    <p className="text-muted-foreground text-center py-8">No notes saved for {format(currentMonth, "MMMM")}.</p>
                 )}
             </CardContent>
         </Card>
     </div>
   );
 }
+
+    
