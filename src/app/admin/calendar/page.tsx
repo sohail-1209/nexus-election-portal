@@ -2,17 +2,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { format, getMonth, getYear, startOfMonth } from "date-fns";
+import { format, getMonth, getYear } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarDays, Save, Bell, Trash2, BellRing, PartyPopper } from "lucide-react";
+import { Save, Bell, Trash2, BellRing } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useNotificationStore } from "@/stores/notificationStore";
-import holidays from '@/lib/holidays.json';
 
 type Note = {
   text: string;
@@ -22,16 +21,6 @@ type Note = {
 type NotesStore = {
   [date: string]: Note;
 };
-
-type Holiday = {
-    date: string;
-    name: string;
-}
-
-const holidaysByDate: Record<string, Holiday> = holidays.reduce((acc, h) => {
-    acc[h.date] = h;
-    return acc;
-}, {} as Record<string, Holiday>);
 
 export default function CalendarPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
@@ -125,13 +114,6 @@ export default function CalendarPage() {
     })
     .sort(([dateA], [dateB]) => new Date(dateA).getTime() - new Date(dateB).getTime());
 
-  const monthlyHolidays = holidays.filter(h => {
-    const holidayDate = new Date(h.date);
-    return getYear(holidayDate) === getYear(currentMonth) && getMonth(holidayDate) === getMonth(currentMonth);
-  });
-
-  const holidayDateStrings = holidays.map(h => h.date);
-
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
@@ -144,26 +126,20 @@ export default function CalendarPage() {
                         onSelect={setDate}
                         month={currentMonth}
                         onMonthChange={setCurrentMonth}
-                        className="rounded-md w-full"
-                        modifiers={{
-                           holiday: (day) => holidayDateStrings.includes(format(day, 'yyyy-MM-dd'))
-                        }}
-                        modifiersClassNames={{
-                           holiday: "border-primary/50 border-2 rounded-full text-primary"
-                        }}
+                        className="rounded-md"
                         classNames={{
+                            root: "w-full p-4",
                             months: "w-full",
-                            month: "w-full space-y-6",
-                            caption: "flex justify-center pt-2 relative items-center text-xl",
-                            table: "w-full border-collapse space-y-2",
+                            month: "w-full space-y-4 min-h-[350px]",
+                            caption: "flex justify-center pt-2 relative items-center text-xl font-medium",
+                            table: "w-full border-collapse space-y-1",
                             head_row: "flex justify-between",
-                            head_cell: "text-muted-foreground rounded-md w-12 font-normal text-md",
+                            head_cell: "text-muted-foreground rounded-md w-12 font-normal text-base",
                             row: "flex w-full mt-2 justify-between",
-                            cell: "h-12 w-12 text-center text-md p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-                            day: "h-12 w-12 p-0 font-normal aria-selected:opacity-100",
+                            cell: "h-14 w-14 text-center text-lg p-0 relative [&:has([aria-selected].day-range-end)]:rounded-r-md [&:has([aria-selected].day-outside)]:bg-accent/50 [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                            day: "h-14 w-14 p-0 font-normal aria-selected:opacity-100",
                             day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 focus:bg-primary focus:text-primary-foreground",
                             day_today: "bg-accent text-accent-foreground rounded-full",
-                            root: "w-full p-4",
                         }}
                     />
                 </CardContent>
@@ -199,27 +175,6 @@ export default function CalendarPage() {
               </div>
             </CardContent>
           </Card>
-           <Card className="shadow-xl">
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-xl">
-                        <PartyPopper className="text-primary" /> Holidays for {format(currentMonth, "MMMM yyyy")}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                     {monthlyHolidays.length > 0 ? (
-                        <div className="space-y-2">
-                            {monthlyHolidays.map(holiday => (
-                                <div key={holiday.date} className="flex items-center gap-4 text-sm">
-                                    <span className="font-semibold">{format(new Date(holiday.date), "do")}</span>
-                                    <span>{holiday.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted-foreground text-sm">No holidays this month.</p>
-                    )}
-                </CardContent>
-            </Card>
         </div>
       </div>
        <Card className="shadow-xl">
