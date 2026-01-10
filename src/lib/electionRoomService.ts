@@ -5,7 +5,7 @@ import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import type { ElectionRoom, Voter, Review, Position, FinalizedResults, ElectionGroup } from '@/lib/types';
 
 
-export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
+export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[], groups: ElectionGroup[] }> {
   const roomsCol = collection(db, "electionRooms");
   const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
   const roomsSnapshot = await getDocs(roomsQuery);
@@ -22,10 +22,25 @@ export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom
       updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString(),
       status: data.status || 'pending',
       roomType: data.roomType || 'voting',
+      groupId: data.groupId || null,
     } as ElectionRoom;
   });
 
-  return { rooms };
+  const groupsCol = collection(db, "groups");
+  const groupsQuery = query(groupsCol, orderBy("createdAt", "desc"));
+  const groupsSnapshot = await getDocs(groupsQuery);
+  const groups = groupsSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name,
+      createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+      roomCount: 0, // Will be calculated on the client
+    } as ElectionGroup;
+  });
+
+
+  return { rooms, groups };
 }
 
 export async function getElectionRoomById(roomId: string, options: { withVoteCounts?: boolean } = {}): Promise<ElectionRoom | null> {
@@ -485,5 +500,3 @@ export async function archiveRoom(roomId: string, adminPassword: string): Promis
         return { success: false, message: error.message || "An unexpected error occurred during archiving." };
     }
 }
-
-    

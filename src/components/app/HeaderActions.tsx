@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2 } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2, Folder } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -103,6 +103,12 @@ export default function HeaderActions() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel>My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
+               <DropdownMenuItem asChild>
+                  <Link href="/admin/groups">
+                      <Folder className="mr-2 h-4 w-4" />
+                      <span>Manage Groups</span>
+                  </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem asChild>
                   <Link href="/admin/calendar">
                       <CalendarDays className="mr-2 h-4 w-4" />
