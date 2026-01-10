@@ -8,10 +8,11 @@ import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Bell, Trash2, BellRing } from "lucide-react";
+import { Save, Bell, Trash2, BellRing, ArrowLeft } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useNotificationStore } from "@/stores/notificationStore";
+import Link from 'next/link';
 
 type Note = {
   text: string;
@@ -116,6 +117,11 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-8">
+        <Button variant="outline" asChild>
+          <Link href="/admin/dashboard">
+            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+          </Link>
+        </Button>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         <div className="lg:col-span-1">
             <Card className="shadow-xl">
@@ -208,5 +214,3 @@ export default function CalendarPage() {
     </div>
   );
 }
-
-    
