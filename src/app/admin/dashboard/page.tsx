@@ -151,6 +151,12 @@ export default function AdminDashboardPage() {
     return () => unsubscribe();
   }, [router]);
 
+  const { votingRooms, reviewRooms } = useMemo(() => {
+    const votingRooms = electionRooms.filter(room => room.roomType !== 'review');
+    const reviewRooms = electionRooms.filter(room => room.roomType === 'review');
+    return { votingRooms, reviewRooms };
+  }, [electionRooms]);
+
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -195,13 +201,28 @@ export default function AdminDashboardPage() {
       </div>
 
       {electionRooms.length > 0 ? (
-        <div className="space-y-6">
-           <h2 className="text-2xl font-semibold font-headline text-center">All Rooms</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {electionRooms.map(room => (
-                <RoomCard key={room.id} room={room} />
-              ))}
-            </div>
+        <div className="space-y-12">
+            {votingRooms.length > 0 && (
+                <div className="space-y-6">
+                    <h2 className="text-2xl font-semibold font-headline text-center">Voting Rooms</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {votingRooms.map(room => (
+                            <RoomCard key={room.id} room={room} />
+                        ))}
+                    </div>
+                </div>
+            )}
+            
+            {reviewRooms.length > 0 && (
+                 <div className="space-y-6">
+                    <h2 className="text-2xl font-semibold font-headline text-center">Review & Rating Rooms</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {reviewRooms.map(room => (
+                            <RoomCard key={room.id} room={room} />
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
       ) : (
         <Card className="text-center py-16">
