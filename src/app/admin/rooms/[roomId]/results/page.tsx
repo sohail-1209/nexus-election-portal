@@ -84,9 +84,9 @@ function ReviewLeaderboard({ positions }: { positions: Position[] }) {
 }
 
 // Helper function to calculate winners for a set of positions
-const calculateWinnersAndConflicts = (positions: Position[]): { finalPositions: Position[], conflicts: WinnerConflict[] } => {
+const calculateWinnersAndConflicts = (positions: Position[]): { conflicts: WinnerConflict[] } => {
     if (!positions || positions.length === 0) {
-        return { finalPositions: [], conflicts: [] };
+        return { conflicts: [] };
     }
 
     const winsByCandidate = new Map<string, { name: string; positions: { positionId: string; positionTitle: string; voteCount: number }[] }>();
@@ -94,10 +94,16 @@ const calculateWinnersAndConflicts = (positions: Position[]): { finalPositions: 
     positions.forEach(pos => {
         if (!pos.candidates || pos.candidates.length === 0) return;
 
-        const maxVotes = Math.max(...pos.candidates.map(c => c.voteCount || 0));
-        if (maxVotes === 0) return; // No winner if no votes were cast
+        // Filter out disqualified candidates before determining the winner for this position
+        const eligibleCandidates = pos.candidates.filter(c => (c.voteCount ?? -1) >= 0);
+        if (eligibleCandidates.length === 0) return;
 
-        const winners = pos.candidates.filter(c => (c.voteCount || 0) === maxVotes);
+        const maxVotes = Math.max(...eligibleCandidates.map(c => c.voteCount || 0));
+        
+        // No conflict if no one has voted in this position
+        if (maxVotes === 0) return;
+
+        const winners = eligibleCandidates.filter(c => (c.voteCount || 0) === maxVotes);
         
         winners.forEach(winner => {
             const existing = winsByCandidate.get(winner.id) || { name: winner.name, positions: [] };
@@ -117,7 +123,7 @@ const calculateWinnersAndConflicts = (positions: Position[]): { finalPositions: 
         }
     });
 
-    return { finalPositions: positions, conflicts };
+    return { conflicts };
 };
 
 
@@ -136,8 +142,7 @@ export default function ElectionResultsPage() {
   const [currentConflicts, setCurrentConflicts] = useState<WinnerConflict[]>([]);
   const [resolvedConflicts, setResolvedConflicts] = useState<Record<string, string>>({}); // candidateId -> chosen positionId
   const [finalPositions, setFinalPositions] = useState<Position[]>([]);
-  const [areConflictsResolved, setAreConflictsResolved] = useState(false);
-
+  const [hasConfirmedResolutions, setHasConfirmedResolutions] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -193,11 +198,10 @@ export default function ElectionResultsPage() {
     if (room?.roomType === 'voting' && !room.finalized) {
       const { conflicts } = calculateWinnersAndConflicts(finalPositions);
       setCurrentConflicts(conflicts);
-      if (conflicts.length === 0 && finalPositions.length > 0) {
-        // If there are no more conflicts, we can consider them "resolved"
-        setAreConflictsResolved(true);
-      } else {
-        setAreConflictsResolved(false);
+      
+      // If there are conflicts, we can't be confirmed.
+      if (conflicts.length > 0) {
+        setHasConfirmedResolutions(false);
       }
     }
   }, [finalPositions, room]);
@@ -206,25 +210,29 @@ export default function ElectionResultsPage() {
   const handleConfirmResolutions = (resolutions: Record<string, string>) => {
     setResolvedConflicts(prev => ({...prev, ...resolutions}));
     
-    // Create a deep copy to manipulate
     let tempPositions = JSON.parse(JSON.stringify(room!.positions)) as Position[];
 
-    // Apply all resolutions cumulatively
     const allResolutions = {...resolvedConflicts, ...resolutions};
 
-    // Disqualify candidates from positions they did not win according to the resolutions
-    tempPositions.forEach(pos => {
-      pos.candidates.forEach(cand => {
-        const chosenPositionId = allResolutions[cand.id];
-        if (chosenPositionId && pos.id !== chosenPositionId) {
-          // If this candidate was part of a conflict, and this is NOT their chosen position, disqualify them.
-          // Disqualification is marked by setting voteCount to a negative number.
-          cand.voteCount = -1;
-        }
+    Object.entries(allResolutions).forEach(([candidateId, chosenPositionId]) => {
+      tempPositions.forEach(pos => {
+        pos.candidates.forEach(cand => {
+          if (cand.id === candidateId && pos.id !== chosenPositionId) {
+            cand.voteCount = -1;
+          }
+        });
       });
     });
 
     setFinalPositions(tempPositions);
+    
+    // Check for new conflicts after applying resolutions
+    const { conflicts: newConflicts } = calculateWinnersAndConflicts(tempPositions);
+    if (newConflicts.length === 0) {
+      setHasConfirmedResolutions(true);
+    } else {
+      setHasConfirmedResolutions(false);
+    }
   };
   
   
@@ -262,26 +270,22 @@ export default function ElectionResultsPage() {
       mdContent += `*Based on **${participants}** completed participant(s).*\n\n`;
 
       positionsToExport.forEach(position => {
-        // Use the original room data for accurate vote counts in the export
         const originalPosition = room.positions.find(p => p.id === position.id);
         const candidatesInPosition = finalPositions.find(p => p.id === position.id)?.candidates || [];
         const eligibleCandidates = candidatesInPosition.filter(c => (c.voteCount ?? -1) >= 0);
         
-        // Determine winner(s) from the eligible candidates for this position
         const maxVotes = eligibleCandidates.length > 0 ? Math.max(...eligibleCandidates.map(c => c.voteCount || 0)) : 0;
         
         mdContent += `### ${position.title}\n\n`;
         mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
         mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
-        // Sort the candidates with original vote counts for display
         const displayCandidates = [...(originalPosition?.candidates || [])].sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
 
         displayCandidates.forEach((candidate, index) => {
           const originalVoteCount = candidate.voteCount || 0;
           const percentage = participants > 0 ? ((originalVoteCount / participants) * 100).toFixed(1) : "0.0";
           
-          // Check if this candidate is a winner in the *resolved* list
           const isWinner = maxVotes > 0 && eligibleCandidates.some(c => c.id === candidate.id && (c.voteCount || 0) === maxVotes);
           
           const isDisqualifiedHere = (finalPositions.find(p=>p.id === position.id)?.candidates.find(c=>c.id === candidate.id)?.voteCount ?? 0) < 0;
@@ -341,7 +345,7 @@ export default function ElectionResultsPage() {
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
-  const canFinalize = room.status === 'closed' && !room.finalized && areConflictsResolved;
+  const canFinalize = room.status === 'closed' && !room.finalized && (currentConflicts.length === 0 || hasConfirmedResolutions);
   
   const renderResults = () => {
     if (room.roomType === 'review') {
@@ -413,29 +417,28 @@ export default function ElectionResultsPage() {
         </div>
       </div>
 
-        {room.finalized ? (
-            <Alert variant="default" className="border-green-600/50 bg-green-500/5">
-                <CheckCircle className="h-4 w-4 text-green-600" />
-                <AlertTitle>Results Finalized &amp; Anonymized</AlertTitle>
-                <AlertDescription>
-                The underlying votes/reviews for this room have been permanently deleted. The results shown are static.
-                </AlertDescription>
-            </Alert>
-        ) : room.status === 'closed' ? (
-         <Alert variant="default" className="border-amber-600/50 bg-amber-500/5">
-            <ShieldAlert className="h-4 w-4 text-amber-600" />
-            <AlertTitle>Ready to Finalize</AlertTitle>
-            <AlertDescription>
-              {currentConflicts.length === 0 ? (
-                "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
-              ) : areConflictsResolved ? (
-                 "Conflicts have been resolved. You may now finalize the results."
-              ) : (
-                "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
-              )}
-            </AlertDescription>
-         </Alert>
-       ) : null}
+      {room.finalized ? (
+          <Alert variant="default" className="border-green-600/50 bg-green-500/5">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertTitle>Results Finalized &amp; Anonymized</AlertTitle>
+              <AlertDescription>
+              The underlying votes/reviews for this room have been permanently deleted. The results shown are static.
+              </AlertDescription>
+          </Alert>
+      ) : room.status === 'closed' ? (
+       <Alert variant="default" className="border-amber-600/50 bg-amber-500/5">
+          <ShieldAlert className="h-4 w-4 text-amber-600" />
+          <AlertTitle>Ready to Finalize</AlertTitle>
+          <AlertDescription>
+            {currentConflicts.length === 0 ? (
+              hasConfirmedResolutions ? "All conflicts have been resolved. You can now finalize the election." : "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
+            ) : (
+               "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
+            )}
+          </AlertDescription>
+       </Alert>
+     ) : null}
+
 
       {room.status !== 'closed' && !room.finalized && (
         <Card className="border-primary bg-primary/5">
@@ -449,7 +452,7 @@ export default function ElectionResultsPage() {
         </Card>
       )}
       
-      {currentConflicts.length > 0 && !areConflictsResolved && room.status === 'closed' && (
+      {currentConflicts.length > 0 && room.status === 'closed' && !room.finalized && (
         <ConflictResolver conflicts={currentConflicts} onResolve={handleConfirmResolutions} />
       )}
 
@@ -458,5 +461,3 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
-
-    
