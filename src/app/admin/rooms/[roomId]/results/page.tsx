@@ -83,17 +83,43 @@ function ReviewLeaderboard({ positions }: { positions: Position[] }) {
     );
 }
 
-// Function to find winners for a given position
-const findWinners = (position: Position): Candidate[] => {
-    if (!position.candidates || position.candidates.length === 0) {
-        return [];
+// Helper function to calculate winners for a set of positions
+const calculateWinnersAndConflicts = (positions: Position[]): { finalPositions: Position[], conflicts: WinnerConflict[] } => {
+    if (!positions || positions.length === 0) {
+        return { finalPositions: [], conflicts: [] };
     }
-    const maxVotes = Math.max(...position.candidates.map(c => c.voteCount || 0));
-    if (maxVotes === 0) {
-        return [];
-    }
-    return position.candidates.filter(c => (c.voteCount || 0) === maxVotes);
+
+    const winsByCandidate = new Map<string, { name: string; positions: { positionId: string; positionTitle: string; voteCount: number }[] }>();
+
+    positions.forEach(pos => {
+        if (!pos.candidates || pos.candidates.length === 0) return;
+
+        const maxVotes = Math.max(...pos.candidates.map(c => c.voteCount || 0));
+        if (maxVotes === 0) return; // No winner if no votes were cast
+
+        const winners = pos.candidates.filter(c => (c.voteCount || 0) === maxVotes);
+        
+        winners.forEach(winner => {
+            const existing = winsByCandidate.get(winner.id) || { name: winner.name, positions: [] };
+            existing.positions.push({ positionId: pos.id, positionTitle: pos.title, voteCount: maxVotes });
+            winsByCandidate.set(winner.id, existing);
+        });
+    });
+
+    const conflicts: WinnerConflict[] = [];
+    winsByCandidate.forEach((data, candidateId) => {
+        if (data.positions.length > 1) {
+            conflicts.push({
+                candidateId,
+                candidateName: data.name,
+                wonPositions: data.positions.map(p => ({ positionId: p.positionId, positionTitle: p.positionTitle })),
+            });
+        }
+    });
+
+    return { finalPositions: positions, conflicts };
 };
+
 
 export default function ElectionResultsPage() {
   const params = useParams();
@@ -107,9 +133,10 @@ export default function ElectionResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
   
-  const [winnerConflicts, setWinnerConflicts] = useState<WinnerConflict[]>([]);
+  const [currentConflicts, setCurrentConflicts] = useState<WinnerConflict[]>([]);
   const [resolvedConflicts, setResolvedConflicts] = useState<Record<string, string>>({}); // candidateId -> chosen positionId
-  const [hasConfirmedResolutions, setHasConfirmedResolutions] = useState(false);
+  const [finalPositions, setFinalPositions] = useState<Position[]>([]);
+  const [areConflictsResolved, setAreConflictsResolved] = useState(false);
 
 
   useEffect(() => {
@@ -128,6 +155,7 @@ export default function ElectionResultsPage() {
         return;
       }
       setRoom(roomData);
+      setFinalPositions(roomData.positions || []);
 
       if (roomData.finalized && roomData.finalizedResults) {
         setTotalCompletedVoters(roomData.finalizedResults.totalParticipants);
@@ -160,73 +188,46 @@ export default function ElectionResultsPage() {
     return () => unsubscribe();
   }, [roomId, router, fetchRoomData]);
 
+  // This effect recalculates conflicts whenever the list of final positions changes
   useEffect(() => {
-    if (!room || room.roomType !== 'voting' || room.finalized) {
-      setWinnerConflicts([]);
-      return;
+    if (room?.roomType === 'voting' && !room.finalized) {
+      const { conflicts } = calculateWinnersAndConflicts(finalPositions);
+      setCurrentConflicts(conflicts);
+      if (conflicts.length === 0 && finalPositions.length > 0) {
+        // If there are no more conflicts, we can consider them "resolved"
+        setAreConflictsResolved(true);
+      } else {
+        setAreConflictsResolved(false);
+      }
     }
+  }, [finalPositions, room]);
+  
+  
+  const handleConfirmResolutions = (resolutions: Record<string, string>) => {
+    setResolvedConflicts(prev => ({...prev, ...resolutions}));
+    
+    // Create a deep copy to manipulate
+    let tempPositions = JSON.parse(JSON.stringify(room!.positions)) as Position[];
 
-    const winsByCandidate = new Map<string, { name: string; positions: { positionId: string; positionTitle: string }[] }>();
+    // Apply all resolutions cumulatively
+    const allResolutions = {...resolvedConflicts, ...resolutions};
 
-    room.positions.forEach(position => {
-      const winners = findWinners(position);
-      winners.forEach(winner => {
-        const existing = winsByCandidate.get(winner.id) || { name: winner.name, positions: [] };
-        existing.positions.push({ positionId: position.id, positionTitle: position.title });
-        winsByCandidate.set(winner.id, existing);
+    // Disqualify candidates from positions they did not win according to the resolutions
+    tempPositions.forEach(pos => {
+      pos.candidates.forEach(cand => {
+        const chosenPositionId = allResolutions[cand.id];
+        if (chosenPositionId && pos.id !== chosenPositionId) {
+          // If this candidate was part of a conflict, and this is NOT their chosen position, disqualify them.
+          // Disqualification is marked by setting voteCount to a negative number.
+          cand.voteCount = -1;
+        }
       });
     });
 
-    const conflicts: WinnerConflict[] = [];
-    winsByCandidate.forEach((data, candidateId) => {
-      if (data.positions.length > 1) {
-        conflicts.push({
-          candidateId,
-          candidateName: data.name,
-          wonPositions: data.positions,
-        });
-      }
-    });
-
-    setWinnerConflicts(conflicts);
-  }, [room]);
-  
-  const handleConfirmResolutions = (resolutions: Record<string, string>) => {
-    setResolvedConflicts(resolutions);
-    setHasConfirmedResolutions(true);
+    setFinalPositions(tempPositions);
   };
   
-  const finalPositions = useMemo(() => {
-    if (!room) return [];
-    if (room.finalized && room.finalizedResults) return room.finalizedResults.positions;
-    if (room.roomType !== 'voting' || !hasConfirmedResolutions || winnerConflicts.length === 0) {
-        return room.positions;
-    }
-
-    // Create a deep copy to manipulate, which includes vote counts
-    let tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
-
-    // This loop marks candidates as disqualified from positions they didn't win in the resolution
-    tempPositions.forEach(pos => {
-        pos.candidates.forEach(cand => {
-            const isConflicted = winnerConflicts.some(c => c.candidateId === cand.id);
-            if (isConflicted) {
-                const chosenPositionId = resolvedConflicts[cand.id];
-                // If this candidate is in a conflict and the current position is NOT their chosen one, disqualify them
-                if (pos.id !== chosenPositionId) {
-                    // Using a negative voteCount as a "disqualified" marker for this position
-                    cand.voteCount = -1;
-                }
-            }
-        });
-    });
-    
-    // This returns the positions with some candidates potentially marked with voteCount: -1
-    return tempPositions;
-
-  }, [room, resolvedConflicts, winnerConflicts, hasConfirmedResolutions]);
-
-
+  
   const handleExportMarkdown = async () => {
     if (!room) return;
     setIsExporting(true);
@@ -265,8 +266,9 @@ export default function ElectionResultsPage() {
         const originalPosition = room.positions.find(p => p.id === position.id);
         const candidatesInPosition = finalPositions.find(p => p.id === position.id)?.candidates || [];
         const eligibleCandidates = candidatesInPosition.filter(c => (c.voteCount ?? -1) >= 0);
-        const sortedCandidates = [...eligibleCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
-        const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
+        
+        // Determine winner(s) from the eligible candidates for this position
+        const maxVotes = eligibleCandidates.length > 0 ? Math.max(...eligibleCandidates.map(c => c.voteCount || 0)) : 0;
         
         mdContent += `### ${position.title}\n\n`;
         mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
@@ -281,9 +283,19 @@ export default function ElectionResultsPage() {
           
           // Check if this candidate is a winner in the *resolved* list
           const isWinner = maxVotes > 0 && eligibleCandidates.some(c => c.id === candidate.id && (c.voteCount || 0) === maxVotes);
+          
+          const isDisqualifiedHere = (finalPositions.find(p=>p.id === position.id)?.candidates.find(c=>c.id === candidate.id)?.voteCount ?? 0) < 0;
 
-          const rankDisplay = isWinner ? `🏆 ${index + 1}` : `${index + 1}`;
-          mdContent += `| ${rankDisplay} | ${candidate.name} | ${originalVoteCount}/${participants} | ${percentage}% |\n`;
+
+          let rankDisplay = `${index + 1}`;
+          if (isWinner) {
+            rankDisplay = `🏆 ${rankDisplay}`;
+          }
+          if (isDisqualifiedHere) {
+             mdContent += `| ~~${rankDisplay}~~ | ~~${candidate.name}~~ | ~~${originalVoteCount}/${participants}~~ | ~~${percentage}%~~ | \n`;
+          } else {
+             mdContent += `| ${rankDisplay} | ${candidate.name} | ${originalVoteCount}/${participants} | ${percentage}% |\n`;
+          }
         });
         mdContent += `\n`;
       });
@@ -329,11 +341,8 @@ export default function ElectionResultsPage() {
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
-  const conflictsExist = winnerConflicts.length > 0;
-  const conflictsResolved = conflictsExist && hasConfirmedResolutions;
-  const canFinalize = room.status === 'closed' && !room.finalized && (!conflictsExist || conflictsResolved);
+  const canFinalize = room.status === 'closed' && !room.finalized && areConflictsResolved;
   
-
   const renderResults = () => {
     if (room.roomType === 'review') {
         const positionsToDisplay = room.finalized ? room.finalizedResults?.positions || [] : room.positions;
@@ -417,9 +426,9 @@ export default function ElectionResultsPage() {
             <ShieldAlert className="h-4 w-4 text-amber-600" />
             <AlertTitle>Ready to Finalize</AlertTitle>
             <AlertDescription>
-              {!conflictsExist ? (
+              {currentConflicts.length === 0 ? (
                 "This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible."
-              ) : conflictsResolved ? (
+              ) : areConflictsResolved ? (
                  "Conflicts have been resolved. You may now finalize the results."
               ) : (
                 "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
@@ -440,8 +449,8 @@ export default function ElectionResultsPage() {
         </Card>
       )}
       
-      {conflictsExist && !conflictsResolved && room.status === 'closed' && (
-        <ConflictResolver conflicts={winnerConflicts} onResolve={handleConfirmResolutions} />
+      {currentConflicts.length > 0 && !areConflictsResolved && room.status === 'closed' && (
+        <ConflictResolver conflicts={currentConflicts} onResolve={handleConfirmResolutions} />
       )}
 
       {renderResults()}
@@ -449,3 +458,5 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
+
+    

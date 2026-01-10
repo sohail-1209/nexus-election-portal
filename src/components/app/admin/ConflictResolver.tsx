@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -31,13 +32,13 @@ export default function ConflictResolver({ conflicts, onResolve }: ConflictResol
     }));
   };
 
-  const allConflictsResolved = useMemo(() => {
+  const allConflictsHaveSelection = useMemo(() => {
     if (conflicts.length === 0) return true;
     return conflicts.every(c => resolutions[c.candidateId]);
   }, [conflicts, resolutions]);
 
   const handleSubmit = () => {
-    if (!allConflictsResolved) {
+    if (!allConflictsHaveSelection) {
         toast({
             variant: 'destructive',
             title: 'Incomplete Resolutions',
@@ -47,8 +48,8 @@ export default function ConflictResolver({ conflicts, onResolve }: ConflictResol
     }
     onResolve(resolutions);
      toast({
-        title: 'Conflicts Resolved',
-        description: 'The result table has been updated with your selections.'
+        title: 'Conflicts Selections Applied',
+        description: 'The result table has been updated. If new conflicts arose, they will be shown. If not, you may now finalize.'
     });
   };
 
@@ -62,7 +63,7 @@ export default function ConflictResolver({ conflicts, onResolve }: ConflictResol
                 <div>
                     <CardTitle className="text-2xl font-headline text-amber-800 dark:text-amber-300">Winner Conflicts Detected</CardTitle>
                     <CardDescription className="text-amber-700 dark:text-amber-400">
-                        One or more candidates have won in multiple positions. You must choose their definitive winning position to finalize the results.
+                        One or more candidates have won in multiple positions. You must choose their definitive winning position to finalize the results. New conflicts may appear after you apply your selections.
                     </CardDescription>
                 </div>
             </div>
@@ -101,16 +102,18 @@ export default function ConflictResolver({ conflicts, onResolve }: ConflictResol
                 <Lightbulb className="h-4 w-4" />
                 <AlertTitle>How this works</AlertTitle>
                 <AlertDescription>
-                    When you select a final position for a candidate, they will be removed as the winner from the other positions. The candidate with the next highest vote count in those vacated positions will be declared the new winner.
+                    When you select a final position for a candidate, they will be removed as the winner from the other positions. The candidate with the next highest vote count in those vacated positions will be declared the new winner. This may create new conflicts to resolve.
                 </AlertDescription>
             </Alert>
             <div className="flex justify-end">
-                <Button onClick={handleSubmit} disabled={!allConflictsResolved}>
+                <Button onClick={handleSubmit} disabled={!allConflictsHaveSelection}>
                     <Check className="mr-2 h-4 w-4" />
-                    Confirm Resolutions
+                    Apply Selections
                 </Button>
             </div>
         </CardContent>
     </Card>
   );
 }
+
+    
