@@ -2,10 +2,10 @@
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position, FinalizedResults, ElectionGroup } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, FinalizedResults } from '@/lib/types';
 
 
-export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[], groups: ElectionGroup[] }> {
+export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
   const roomsCol = collection(db, "electionRooms");
   const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
   const roomsSnapshot = await getDocs(roomsQuery);
@@ -26,21 +26,7 @@ export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom
     } as ElectionRoom;
   });
 
-  const groupsCol = collection(db, "groups");
-  const groupsQuery = query(groupsCol, orderBy("createdAt", "desc"));
-  const groupsSnapshot = await getDocs(groupsQuery);
-  const groups = groupsSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name,
-      createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-      roomCount: 0, // Will be calculated on the client
-    } as ElectionGroup;
-  });
-
-
-  return { rooms, groups };
+  return { rooms };
 }
 
 export async function getElectionRoomById(roomId: string, options: { withVoteCounts?: boolean } = {}): Promise<ElectionRoom | null> {

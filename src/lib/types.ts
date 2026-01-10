@@ -53,10 +53,3 @@ export interface Voter {
   votedAt?: string;
   ownPositionTitle?: string;
 }
-
-export interface ElectionGroup {
-    id: string;
-    name: string;
-    roomCount: number;
-    createdAt: string;
-}

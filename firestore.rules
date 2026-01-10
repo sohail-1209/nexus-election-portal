@@ -22,10 +22,5 @@ service cloud.firestore {
          allow read, update, delete: if false; // Protect vote privacy
       }
     }
-
-    // Rules for groups
-    match /groups/{groupId} {
-      allow read, write: if request.auth != null;
-    }
   }
 }
