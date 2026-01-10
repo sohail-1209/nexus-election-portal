@@ -342,9 +342,6 @@ export default function ElectionResultsPage() {
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
   const conflictsExist = currentConflicts.length > 0;
-  // A room can be finalized if its status is 'closed', it's not already finalized, AND either:
-  // 1. There are no conflicts and resolutions have been "confirmed" (even if there was nothing to resolve)
-  // 2. There were conflicts, they have been resolved, and no new conflicts have arisen.
   const canFinalize = room.status === 'closed' && !room.finalized && hasConfirmedResolutions && !conflictsExist;
 
   
