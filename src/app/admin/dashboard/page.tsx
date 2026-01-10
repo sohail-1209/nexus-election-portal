@@ -187,23 +187,16 @@ export default function AdminDashboardPage() {
             <h1 className="text-3xl font-bold font-headline">Election Dashboard</h1>
             <p className="text-muted-foreground mt-2">Manage your election rooms.</p>
         </div>
-        <div className="flex justify-center gap-4">
-            <Button asChild>
-                <Link href="/admin/rooms/create">
-                    <PlusCircle /> Create Voting Room
-                </Link>
-            </Button>
-            <Button asChild variant="secondary">
-                <Link href="/admin/rooms/create-review">
-                    <PlusCircle /> Create Review Room
-                </Link>
-            </Button>
-        </div>
       </div>
       
       {electionRooms.length > 0 ? (
         <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
-          <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
+          <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
+              <Button asChild>
+                <Link href="/admin/rooms/create">
+                    <PlusCircle /> Create Voting Room
+                </Link>
+              </Button>
               <ScrollArea className="flex-grow">
                 {votingRooms.length > 0 ? (
                   <div className="grid grid-cols-1 gap-6 pr-4">
@@ -217,7 +210,12 @@ export default function AdminDashboardPage() {
               </ScrollArea>
           </div>
           
-          <div className="flex flex-col min-h-0 rounded-lg border bg-card/50 p-4">
+          <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
+              <Button asChild variant="secondary">
+                <Link href="/admin/rooms/create-review">
+                    <PlusCircle /> Create Review Room
+                </Link>
+              </Button>
               <ScrollArea className="flex-grow">
                   {reviewRooms.length > 0 ? (
                     <div className="grid grid-cols-1 gap-6 pr-4">
@@ -232,13 +230,27 @@ export default function AdminDashboardPage() {
           </div>
         </div>
       ) : (
-        <Card className="text-center py-16 flex-grow">
-          <CardHeader>
-            <CardTitle className="text-2xl">No Rooms Yet</CardTitle>
-            <CardDescription>Get started by creating your first voting or review room.</CardDescription>
-          </CardHeader>
-        </Card>
+         <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
+            <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
+              <Button asChild>
+                <Link href="/admin/rooms/create">
+                    <PlusCircle /> Create Voting Room
+                </Link>
+              </Button>
+              <div className="text-center text-muted-foreground py-10 flex-grow flex items-center justify-center">No voting rooms created yet.</div>
+            </div>
+            <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
+              <Button asChild variant="secondary">
+                <Link href="/admin/rooms/create-review">
+                    <PlusCircle /> Create Review Room
+                </Link>
+              </Button>
+              <div className="text-center text-muted-foreground py-10 flex-grow flex items-center justify-center">No review rooms created yet.</div>
+            </div>
+        </div>
       )}
     </div>
   );
 }
+
+    
