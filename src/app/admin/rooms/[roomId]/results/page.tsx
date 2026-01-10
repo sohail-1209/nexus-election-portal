@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/dialog";
 import ShareableLinkDisplay from "@/components/app/admin/ShareableLinkDisplay";
 import FinalizeRoomDialog from "@/components/app/admin/FinalizeRoomDialog";
-import ConflictResolver, { type WinnerConflict } from "@/components/app/admin/ConflictResolver";
 
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
@@ -83,53 +82,6 @@ function ReviewLeaderboard({ positions }: { positions: Position[] }) {
     );
 }
 
-// Helper function to calculate winners for a set of positions
-const calculateWinnersAndConflicts = (positions: Position[]): { conflicts: WinnerConflict[] } => {
-    if (!positions || positions.length === 0) {
-        return { conflicts: [] };
-    }
-
-    const winsByCandidate = new Map<string, { name: string; positions: { positionId: string; positionTitle: string }[] }>();
-
-    positions.forEach(pos => {
-        if (!pos.candidates || pos.candidates.length === 0) return;
-
-        // Filter out disqualified candidates before determining the winner for this position
-        const eligibleCandidates = pos.candidates.filter(c => (c.voteCount ?? -1) >= 0);
-        if (eligibleCandidates.length === 0) return;
-
-        const maxVotes = Math.max(...eligibleCandidates.map(c => c.voteCount || 0));
-        
-        // No conflict if no one has voted in this position
-        if (maxVotes === 0) return;
-
-        const winners = eligibleCandidates.filter(c => (c.voteCount || 0) === maxVotes);
-        
-        winners.forEach(winner => {
-            const existing = winsByCandidate.get(winner.id) || { name: winner.name, positions: [] };
-            if (!existing.positions.some(p => p.positionId === pos.id)) {
-                existing.positions.push({ positionId: pos.id, positionTitle: pos.title });
-            }
-            winsByCandidate.set(winner.id, existing);
-        });
-    });
-
-    const conflicts: WinnerConflict[] = [];
-    winsByCandidate.forEach((data, candidateId) => {
-        if (data.positions.length > 1) {
-            conflicts.push({
-                candidateId,
-                candidateName: data.name,
-                wonPositions: data.positions,
-            });
-        }
-    });
-
-    return { conflicts };
-};
-
-
-
 export default function ElectionResultsPage() {
   const params = useParams();
   const router = useRouter();
@@ -142,9 +94,6 @@ export default function ElectionResultsPage() {
   const [error, setError] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
   
-  const [resolvedConflicts, setResolvedConflicts] = useState<Record<string, string>>({}); // candidateId -> chosen positionId
-  const [hasConfirmedResolutions, setHasConfirmedResolutions] = useState(false);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setBaseUrl(window.location.origin);
@@ -155,8 +104,6 @@ export default function ElectionResultsPage() {
     if (!roomId) return;
     try {
       setLoading(true);
-      setHasConfirmedResolutions(false);
-      setResolvedConflicts({});
       const roomData = await getElectionRoomById(roomId, { withVoteCounts: true });
       if (!roomData) {
         notFound();
@@ -194,43 +141,12 @@ export default function ElectionResultsPage() {
     });
     return () => unsubscribe();
   }, [roomId, router, fetchRoomData]);
-
-  const finalPositions = useMemo(() => {
-      if (!room || !room.positions) return [];
-      
-      const tempPositions = JSON.parse(JSON.stringify(room.positions)) as Position[];
-      
-      Object.entries(resolvedConflicts).forEach(([candidateId, chosenPositionId]) => {
-          tempPositions.forEach(pos => {
-              const candidate = pos.candidates.find(cand => cand.id === candidateId);
-              if (candidate && pos.id !== chosenPositionId) {
-                  candidate.voteCount = -1;
-              }
-          });
-      });
-
-      return tempPositions;
-  }, [room, resolvedConflicts]);
-
-  const currentConflicts = useMemo(() => {
-      if (room?.roomType === 'voting' && room.status === 'closed' && !room.finalized) {
-          const { conflicts } = calculateWinnersAndConflicts(finalPositions);
-          return conflicts;
-      }
-      return [];
-  }, [finalPositions, room]);
-  
-  const handleConfirmResolutions = (resolutions: Record<string, string>) => {
-    setResolvedConflicts(prev => ({...prev, ...resolutions}));
-    setHasConfirmedResolutions(true);
-  };
-  
   
   const handleExportMarkdown = async () => {
     if (!room) return;
     setIsExporting(true);
 
-    const positionsToExport = finalPositions || room.positions;
+    const positionsToExport = room.positions;
     const participants = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
 
     let mdContent = `# 📊 Results for: ${room.title}\n\n`;
@@ -260,36 +176,26 @@ export default function ElectionResultsPage() {
       mdContent += `*Based on **${participants}** completed participant(s).*\n\n`;
 
       positionsToExport.forEach(position => {
-        const originalPosition = room.positions.find(p => p.id === position.id);
-        const candidatesInPosition = finalPositions.find(p => p.id === position.id)?.candidates || [];
-        const eligibleCandidates = candidatesInPosition.filter(c => (c.voteCount ?? -1) >= 0);
-        
-        const maxVotes = eligibleCandidates.length > 0 ? Math.max(...eligibleCandidates.map(c => c.voteCount || 0)) : 0;
+        const candidatesInPosition = position.candidates || [];
+        const maxVotes = candidatesInPosition.length > 0 ? Math.max(...candidatesInPosition.map(c => c.voteCount || 0)) : 0;
         
         mdContent += `### ${position.title}\n\n`;
         mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
         mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
-        const displayCandidates = [...(originalPosition?.candidates || [])].sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
+        const displayCandidates = [...candidatesInPosition].sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
 
         displayCandidates.forEach((candidate, index) => {
-          const originalVoteCount = candidate.voteCount || 0;
-          const percentage = participants > 0 ? ((originalVoteCount / participants) * 100).toFixed(1) : "0.0";
-          
-          const isWinner = maxVotes > 0 && eligibleCandidates.some(c => c.id === candidate.id && (c.voteCount || 0) === maxVotes);
-          
-          const isDisqualifiedHere = (finalPositions.find(p=>p.id === position.id)?.candidates.find(c=>c.id === candidate.id)?.voteCount ?? 0) < 0;
-
+          const voteCount = candidate.voteCount || 0;
+          const percentage = participants > 0 ? ((voteCount / participants) * 100).toFixed(1) : "0.0";
+          const isWinner = maxVotes > 0 && voteCount === maxVotes;
 
           let rankDisplay = `${index + 1}`;
           if (isWinner) {
             rankDisplay = `🏆 ${rankDisplay}`;
           }
-          if (isDisqualifiedHere) {
-             mdContent += `| ~~${rankDisplay}~~ | ~~${candidate.name}~~ | ~~${originalVoteCount}/${participants}~~ | ~~${percentage}%~~ | \n`;
-          } else {
-             mdContent += `| ${rankDisplay} | ${candidate.name} | ${originalVoteCount}/${participants} | ${percentage}% |\n`;
-          }
+          
+          mdContent += `| ${rankDisplay} | ${candidate.name} | ${voteCount}/${participants} | ${percentage}% |\n`;
         });
         mdContent += `\n`;
       });
@@ -335,13 +241,12 @@ export default function ElectionResultsPage() {
   const shareableResultsLink = `${baseUrl}/results/${room.id}`;
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
-  const conflictsExist = currentConflicts.length > 0;
-  const canFinalize = room.status === 'closed' && !room.finalized && (!conflictsExist || hasConfirmedResolutions);
+  const canFinalize = room.status === 'closed' && !room.finalized;
 
   
   const renderResults = () => {
     if (room.roomType === 'review') {
-        const positionsToDisplay = room.finalized ? room.finalizedResults?.positions || [] : finalPositions;
+        const positionsToDisplay = room.finalized ? room.finalizedResults?.positions || [] : room.positions;
         return (
             <div className="space-y-8">
                 <ReviewResultsDisplay room={room} positions={positionsToDisplay} />
@@ -360,7 +265,7 @@ export default function ElectionResultsPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ResultsTable positions={finalPositions} totalCompletedVoters={participantsCount} room={room} />
+                <ResultsTable positions={room.positions} totalCompletedVoters={participantsCount} room={room} />
             </CardContent>
         </Card>
     );
@@ -403,7 +308,7 @@ export default function ElectionResultsPage() {
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                 {isExporting ? 'Exporting...' : 'Export as .md'}
             </Button>
-            {canFinalize && !conflictsExist && (
+            {canFinalize && (
               <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />
             )}
         </div>
@@ -422,9 +327,7 @@ export default function ElectionResultsPage() {
           <ShieldAlert className="h-4 w-4 text-amber-600" />
           <AlertTitle>Ready to Finalize</AlertTitle>
           <AlertDescription>
-            {conflictsExist ? "This election is complete, but there are winner conflicts to resolve before you can finalize the results."
-             : hasConfirmedResolutions ? "Conflicts resolved. You may now finalize the results."
-             : "This election is complete. Review the results, and if all looks correct, you may finalize."}
+            This election is complete. Review the results, and if all looks correct, you may finalize.
           </AlertDescription>
        </Alert>
      ) : null}
@@ -441,15 +344,9 @@ export default function ElectionResultsPage() {
             </CardHeader>
         </Card>
       )}
-      
-      {conflictsExist && room.status === 'closed' && !room.finalized && (
-        <ConflictResolver conflicts={currentConflicts} onResolve={handleConfirmResolutions} />
-      )}
 
       {renderResults()}
 
     </div>
   );
 }
-
-    

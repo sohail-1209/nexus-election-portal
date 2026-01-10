@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 interface ResultsTableProps {
   positions: Position[];
   totalCompletedVoters: number;
-  room: ElectionRoom; // Pass the original room data to get original vote counts
+  room: ElectionRoom; 
 }
 
 export default function ResultsTable({ positions, totalCompletedVoters, room }: ResultsTableProps) {
@@ -28,19 +28,10 @@ export default function ResultsTable({ positions, totalCompletedVoters, room }: 
   return (
     <div className="space-y-8">
       {positions.map((position) => {
-        // Use the original, unmodified room data to get accurate vote counts for display
-        const originalPosition = room.positions.find(p => p.id === position.id);
-
-        // This list contains candidates with potentially modified vote counts (-1 for disqualified)
-        const eligibleCandidates = position.candidates.filter(c => (c.voteCount ?? 0) >= 0);
+        const candidatesInPosition = position.candidates || [];
+        const maxVotes = candidatesInPosition.length > 0 ? Math.max(...candidatesInPosition.map(c => c.voteCount || 0)) : 0;
         
-        // Find the new winner(s) from the pool of eligible candidates
-        const maxVotes = eligibleCandidates.length > 0
-          ? Math.max(...eligibleCandidates.map(c => c.voteCount || 0))
-          : 0;
-
-        // Sort the candidates for display using their *original* vote counts
-        const sortedDisplayCandidates = [...(originalPosition?.candidates || [])].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        const sortedDisplayCandidates = [...candidatesInPosition].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
 
         return (
           <div key={position.id} className="border rounded-lg shadow-sm">
@@ -59,11 +50,7 @@ export default function ResultsTable({ positions, totalCompletedVoters, room }: 
                 {sortedDisplayCandidates.map((candidate, index) => {
                   const voteCount = candidate.voteCount || 0;
                   const percentage = totalCompletedVoters > 0 ? ((voteCount / totalCompletedVoters) * 100).toFixed(1) : "0.0";
-                  
-                  // A candidate is a winner if they are in the eligible pool and their vote count matches the max votes of that pool
-                  const isWinner = maxVotes > 0 && 
-                                   eligibleCandidates.some(c => c.id === candidate.id) &&
-                                   voteCount === maxVotes;
+                  const isWinner = maxVotes > 0 && voteCount === maxVotes;
                   
                   return (
                     <TableRow key={candidate.id} className={cn(isWinner && "bg-green-600/10")}>
@@ -110,5 +97,3 @@ export default function ResultsTable({ positions, totalCompletedVoters, room }: 
     </div>
   );
 }
-
-    
