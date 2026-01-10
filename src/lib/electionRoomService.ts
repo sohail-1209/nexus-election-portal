@@ -7,8 +7,7 @@ import type { ElectionRoom, Voter, Review, Position, FinalizedResults, ElectionG
 
 export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[], groups: ElectionGroup[] }> {
   const roomsCol = collection(db, "electionRooms");
-  // Fetch only rooms that are not part of any group
-  const roomsQuery = query(roomsCol, where("groupId", "==", null), orderBy("createdAt", "desc"));
+  const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
   const roomsSnapshot = await getDocs(roomsQuery);
   const rooms = roomsSnapshot.docs.map(doc => {
     const data = doc.data();
@@ -26,19 +25,8 @@ export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom
     } as ElectionRoom;
   });
 
-  const groupsCol = collection(db, "groups");
-  const groupsQuery = query(groupsCol, orderBy("createdAt", "desc"));
-  const groupsSnapshot = await getDocs(groupsQuery);
-  const groups = groupsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return {
-          id: doc.id,
-          name: data.name,
-          roomCount: data.roomCount || 0,
-          createdAt: (data.createdAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
-      } as ElectionGroup
-  });
-
+  // Returning an empty array for groups as the feature was removed.
+  const groups: ElectionGroup[] = [];
 
   return { rooms, groups };
 }
@@ -462,3 +450,5 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         return { success: false, message: "An unexpected error occurred during finalization." };
     }
 }
+
+    
