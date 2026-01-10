@@ -1,5 +1,5 @@
 
-import type { Position } from "@/lib/types";
+import type { Position, Candidate } from "@/lib/types";
 import {
   Table,
   TableBody,
@@ -27,7 +27,9 @@ export default function ResultsTable({ positions, totalCompletedVoters }: Result
   return (
     <div className="space-y-8">
       {positions.map((position) => {
-        const sortedCandidates = [...position.candidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
+        // Filter out candidates with negative vote counts (used for conflict resolution)
+        const eligibleCandidates = position.candidates.filter(c => (c.voteCount ?? 0) >= 0);
+        const sortedCandidates = [...eligibleCandidates].sort((a, b) => (b.voteCount || 0) - (a.voteCount || 0));
         const maxVotes = sortedCandidates.length > 0 ? (sortedCandidates[0].voteCount || 0) : 0;
         
         return (
