@@ -5,7 +5,7 @@ import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import type { ElectionRoom, Voter, Review, Position, FinalizedResults, ElectionGroup } from '@/lib/types';
 
 
-export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[], groups: ElectionGroup[] }> {
+export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
   const roomsCol = collection(db, "electionRooms");
   const roomsQuery = query(roomsCol, orderBy("createdAt", "desc"));
   const roomsSnapshot = await getDocs(roomsQuery);
@@ -25,10 +25,7 @@ export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom
     } as ElectionRoom;
   });
 
-  // Returning an empty array for groups as the feature was removed.
-  const groups: ElectionGroup[] = [];
-
-  return { rooms, groups };
+  return { rooms };
 }
 
 
@@ -73,6 +70,7 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     })),
     averageRating: 0,
     reviews: [],
+    ratingDistribution: [],
   }));
 
   if (withVoteCounts) {
@@ -416,7 +414,8 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         // Update the main room document with finalized results
         batch.update(roomRef, {
             finalized: true,
-            finalizedResults: finalizedResults
+            finalizedResults: finalizedResults,
+            status: 'closed', // Also ensure status is closed
         });
 
         // Delete all documents in the 'votes' subcollection
@@ -450,5 +449,3 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
         return { success: false, message: "An unexpected error occurred during finalization." };
     }
 }
-
-    
