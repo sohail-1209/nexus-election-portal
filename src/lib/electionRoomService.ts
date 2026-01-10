@@ -485,3 +485,5 @@ export async function archiveRoom(roomId: string, adminPassword: string): Promis
         return { success: false, message: error.message || "An unexpected error occurred during archiving." };
     }
 }
+
+    

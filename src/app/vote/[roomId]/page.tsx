@@ -183,18 +183,18 @@ const ReviewPositionCard = ({
   <Card key={position.id}>
     <CardHeader>
       <CardTitle className="text-xl sm:text-2xl">{position.title}: {position.candidates[0]?.name}</CardTitle>
-      <CardDescription>Provide your feedback and rating.</CardDescription>
+      <CardDescription>Provide your feedback and rating. Both are required.</CardDescription>
     </CardHeader>
     <CardContent className="space-y-6">
       <div>
-        <Label className="mb-2 block text-center sm:text-left">Rating</Label>
+        <Label className="mb-2 block text-center sm:text-left font-semibold">Rating</Label>
         <div className="flex flex-col items-center gap-2">
             <StarRating rating={selection.rating} onRatingChange={(rating) => onSelectionChange({ rating })} />
             <span className="font-bold text-lg w-24 text-center bg-muted rounded-md py-1">{selection.rating} / 5</span>
         </div>
       </div>
       <div>
-        <Label htmlFor={`feedback-${position.id}`}>Feedback</Label>
+        <Label htmlFor={`feedback-${position.id}`} className="font-semibold">Feedback</Label>
         <Textarea 
           id={`feedback-${position.id}`}
           placeholder="Enter your detailed feedback here..." 
@@ -465,16 +465,25 @@ export default function VotingPage() {
       }
   };
 
-  const handleNext = () => {
-    if (!room || !filteredPositions || currentPositionIndex >= filteredPositions.length - 1) return;
-    
-    if (room.roomType === 'review' && !isCoordinator) {
+  const validateReview = () => {
       const currentPositionId = filteredPositions[currentPositionIndex].id;
       const currentReview = selections[currentPositionId];
       if (!currentReview || currentReview.rating === 0) {
         toast({ variant: "destructive", title: "Incomplete", description: "Please provide a star rating before proceeding." });
-        return;
+        return false;
       }
+      if (!currentReview.feedback || currentReview.feedback.trim() === '') {
+        toast({ variant: "destructive", title: "Incomplete", description: "Please provide written feedback before proceeding." });
+        return false;
+      }
+      return true;
+  }
+
+  const handleNext = () => {
+    if (!room || !filteredPositions || currentPositionIndex >= filteredPositions.length - 1) return;
+    
+    if (room.roomType === 'review' && !isCoordinator) {
+      if (!validateReview()) return;
     }
     setCurrentPositionIndex(currentPositionIndex + 1);
   };
@@ -491,23 +500,26 @@ export default function VotingPage() {
     }
 
     if (room.roomType === 'review' && !isCoordinator) {
-      const currentPositionId = filteredPositions[currentPositionIndex].id;
-      const currentReview = selections[currentPositionId];
-      if (!currentReview || currentReview.rating === 0) {
-        toast({ variant: "destructive", title: "Incomplete", description: "Please provide a star rating before submitting." });
-        return;
-      }
+      if (!validateReview()) return;
     }
 
     setIsSubmitting(true);
     let result;
     if (room.roomType === 'review') {
       const validSelections = Object.entries(selections).reduce((acc, [posId, sel]) => {
-          if (sel.rating > 0) {
+          if (sel.rating > 0 && sel.feedback && sel.feedback.trim() !== '') {
               acc[posId] = sel;
           }
           return acc;
       }, {} as Record<string, any>);
+
+      if (isCoordinator && Object.keys(validSelections).length === 0) {
+          // If a coordinator skipped all reviews, allow submission without error
+          setSubmissionComplete(true);
+          setIsSubmitting(false);
+          return;
+      }
+      
       result = await submitReview(roomId, voterEmail, validSelections);
     } else {
       result = await submitBallot(roomId, voterEmail, selections);
@@ -726,3 +738,5 @@ export default function VotingPage() {
     </div>
   );
 }
+
+    
