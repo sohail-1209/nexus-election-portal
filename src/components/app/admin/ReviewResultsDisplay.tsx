@@ -1,7 +1,8 @@
+
 "use client";
 
-import { useState } from "react";
-import type { ElectionRoom, Position } from "@/lib/types";
+import { useState, useMemo } from "react";
+import type { ElectionRoom, Position, Review } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import StarRating from "@/components/app/StarRating";
 import { formatDistanceToNow } from "date-fns";
@@ -13,11 +14,30 @@ interface ReviewResultsDisplayProps {
   positions: Position[];
 }
 
+// Fisher-Yates shuffle algorithm
+const shuffleArray = <T,>(array: T[]): T[] => {
+  const newArray = [...array];
+  for (let i = newArray.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+  }
+  return newArray;
+};
+
 export default function ReviewResultsDisplay({ room, positions }: ReviewResultsDisplayProps) {
   const [openFeedbackPositionId, setOpenFeedbackPositionId] = useState<string | null>(null);
+  const [shuffledReviews, setShuffledReviews] = useState<Record<string, Review[]>>({});
 
-  const toggleFeedbackVisibility = (positionId: string) => {
-    setOpenFeedbackPositionId(prevId => prevId === positionId ? null : positionId);
+  const toggleFeedbackVisibility = (positionId: string, reviews: Review[] = []) => {
+    const isOpening = openFeedbackPositionId !== positionId;
+    setOpenFeedbackPositionId(isOpening ? positionId : null);
+
+    if (isOpening) {
+      setShuffledReviews(prev => ({
+        ...prev,
+        [positionId]: shuffleArray(reviews)
+      }));
+    }
   };
   
   return (
@@ -25,6 +45,7 @@ export default function ReviewResultsDisplay({ room, positions }: ReviewResultsD
       {positions.map(position => {
         const totalReviews = position.reviews?.length || 0;
         const isFeedbackVisible = openFeedbackPositionId === position.id;
+        const reviewsToDisplay = shuffledReviews[position.id] || [];
 
         return (
             <Card key={position.id} className="shadow-lg">
@@ -49,7 +70,7 @@ export default function ReviewResultsDisplay({ room, positions }: ReviewResultsD
                 <CardContent>
                     <div className="flex justify-start items-center mb-4">
                         {totalReviews > 0 && (
-                            <Button variant="outline" size="sm" onClick={() => toggleFeedbackVisibility(position.id)}>
+                            <Button variant="outline" size="sm" onClick={() => toggleFeedbackVisibility(position.id, position.reviews)}>
                                 {isFeedbackVisible ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
                                 {isFeedbackVisible ? "Hide Feedback" : "View All Feedback"}
                             </Button>
@@ -58,7 +79,7 @@ export default function ReviewResultsDisplay({ room, positions }: ReviewResultsD
                     {totalReviews > 0 ? (
                         isFeedbackVisible && (
                             <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                                {position.reviews?.map((review, index) => (
+                                {reviewsToDisplay.map((review, index) => (
                                     <div key={index} className="border bg-muted/30 rounded-lg p-4">
                                         <blockquote className="text-sm italic border-l-4 border-primary pl-4">
                                         "{review.feedback || 'No written feedback provided.'}"
