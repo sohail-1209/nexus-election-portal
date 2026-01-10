@@ -16,6 +16,7 @@ import Link from "next/link";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 
 function DashboardSkeleton() {
   return (
@@ -113,6 +114,9 @@ function RoomCard({ room, onRoomDeleted }: { room: ElectionRoom; onRoomDeleted: 
                         <BarChart3 className="mr-2 h-4 w-4" /> Results
                     </Link>
                 </Button>
+                <div className="col-span-2">
+                    <DeleteRoomDialog roomId={room.id} roomTitle={room.title} onRoomDeleted={onRoomDeleted} />
+                </div>
             </CardFooter>
         </Card>
     );
@@ -153,8 +157,8 @@ export default function AdminDashboardPage() {
   }, [router, fetchData]);
 
   const { votingRooms, reviewRooms } = useMemo(() => {
-    const votingRooms = electionRooms.filter(room => room.roomType !== 'review');
-    const reviewRooms = electionRooms.filter(room => room.roomType === 'review');
+    const votingRooms = electionRooms.filter(room => room.roomType !== 'review' && room.status !== 'archived');
+    const reviewRooms = electionRooms.filter(room => room.roomType === 'review' && room.status !== 'archived');
     return { votingRooms, reviewRooms };
   }, [electionRooms]);
 
@@ -239,5 +243,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    
