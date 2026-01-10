@@ -320,7 +320,7 @@ export default function ElectionResultsPage() {
                 {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
                 {isExporting ? 'Exporting...' : 'Export as .md'}
             </Button>
-            {!room.finalized && (
+            {room.status === 'closed' && !room.finalized && (
               <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />
             )}
         </div>
@@ -337,9 +337,9 @@ export default function ElectionResultsPage() {
         ) : room.status === 'closed' && (
          <Alert variant="default" className="border-amber-600/50 bg-amber-500/5">
             <ShieldAlert className="h-4 w-4 text-amber-600" />
-            <AlertTitle>Election Closed</AlertTitle>
+            <AlertTitle>Ready to Finalize</AlertTitle>
             <AlertDescription>
-                This election is complete and results are final. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible.
+                This election is complete. To ensure participant privacy, you can finalize and anonymize the results. This action is irreversible.
             </AlertDescription>
          </Alert>
        )}
@@ -362,3 +362,5 @@ export default function ElectionResultsPage() {
     </>
   );
 }
+
+    
