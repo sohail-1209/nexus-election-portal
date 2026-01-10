@@ -405,9 +405,9 @@ export default function VotingPage() {
       const skippableRoles = [...facultyRoles, ...generalClubRoles];
       const canSkip = skippableRoles.some(role => role.toLowerCase() === ownPositionTitle.toLowerCase());
       
-      const positionsToShow = room.positions.filter(
-        (p) => p.title.toLowerCase() !== ownPositionTitle.toLowerCase()
-      );
+      const positionsToShow = room.roomType === 'review'
+        ? room.positions.filter((p) => p.title.toLowerCase() !== ownPositionTitle.toLowerCase())
+        : room.positions;
 
       const initialSelections: Record<string, any> = {};
       positionsToShow.forEach(p => {
@@ -482,7 +482,7 @@ export default function VotingPage() {
   const handleNext = () => {
     if (!room || !filteredPositions || currentPositionIndex >= filteredPositions.length - 1) return;
     
-    if (room.roomType === 'review' && !isCoordinator) {
+    if (room.roomType === 'review') {
       if (!validateReview()) return;
     }
     setCurrentPositionIndex(currentPositionIndex + 1);
@@ -499,7 +499,7 @@ export default function VotingPage() {
         return;
     }
 
-    if (room.roomType === 'review' && !isCoordinator) {
+    if (room.roomType === 'review') {
       if (!validateReview()) return;
     }
 
