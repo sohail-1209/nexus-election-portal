@@ -134,7 +134,7 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
                     <h2 className="text-xl font-bold">{isVoting ? "Voting Rooms" : "Review & Rating Rooms"}</h2>
                     <p className="text-sm text-muted-foreground">{isVoting ? "Create and manage standard elections." : "Gather feedback and ratings."}</p>
                 </div>
-                <Button asChild size="sm" variant={isVoting ? "default" : "secondary"}>
+                <Button asChild size="sm" variant="outline">
                   <Link href={isVoting ? "/admin/rooms/create" : "/admin/rooms/create-review"}>
                       <PlusCircle /> Create New
                   </Link>
