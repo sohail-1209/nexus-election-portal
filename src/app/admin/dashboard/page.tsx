@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -11,14 +10,13 @@ import type { ElectionRoom } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, CalendarDays, Home } from "lucide-react";
+import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, Home } from "lucide-react";
 import Link from "next/link";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 function DashboardSkeleton() {
@@ -98,7 +96,7 @@ function RoomCard({ room, onRoomDeleted }: { room: ElectionRoom; onRoomDeleted: 
                     <Users className="mr-2 h-4 w-4 text-primary" /> {room.positions.reduce((acc, p) => acc + p.candidates.length, 0)} Candidates
                 </div>
                 <div className="flex items-center">
-                    <CalendarDays className="mr-2 h-4 w-4 text-primary" /> Created: {format(new Date(room.createdAt), "PPP")}
+                    <Users className="mr-2 h-4 w-4 text-primary" /> Created: {format(new Date(room.createdAt), "PPP")}
                 </div>
                 {room.isAccessRestricted && (
                     <div className="flex items-center">
@@ -160,10 +158,12 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
     );
 }
 
+
 export default function AdminDashboardPage() {
   const [electionRooms, setElectionRooms] = useState<ElectionRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'voting' | 'review'>('voting');
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
@@ -224,40 +224,41 @@ export default function AdminDashboardPage() {
         </div>
     )
   }
-
-  const navItemClasses = "inline-flex items-center justify-start whitespace-nowrap rounded-sm px-3 py-1.5 text-base font-normal ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-foreground/80 hover:bg-accent hover:text-accent-foreground";
-  const activeNavItemClasses = "bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 hover:text-primary-foreground";
-
+  
+  const navItemClasses = "relative flex items-center gap-3 px-4 py-3 text-muted-foreground font-medium rounded-lg transition-colors hover:text-primary hover:bg-primary/10";
+  const activeNavItemClasses = "text-primary bg-primary/10 after:content-[''] after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:h-2/3 after:w-1 after:bg-primary after:rounded-l-lg";
 
   return (
-    <div className="h-screen flex">
-        <Tabs defaultValue="voting" orientation="vertical" className="flex h-full gap-4">
-            <TabsList className={cn(
-                "flex flex-col h-full justify-start items-stretch p-2 w-52 bg-muted rounded-none"
-            )}>
-                 <Button variant="ghost" asChild className={cn(navItemClasses, "gap-2")}>
-                    <Link href="/">
-                        <Home /> Home
-                    </Link>
-                </Button>
-                <TabsTrigger value="voting" className={cn(navItemClasses, "data-[state=active]:" + activeNavItemClasses, "gap-2")}>
-                    <Vote /> Voting Rooms
-                </TabsTrigger>
-                <TabsTrigger value="review" className={cn(navItemClasses, "data-[state=active]:" + activeNavItemClasses, "gap-2")}>
-                    <Star /> Review Rooms
-                </TabsTrigger>
-            </TabsList>
-            <div className="flex-1 p-6 min-w-0 overflow-hidden">
-                <div className="h-full">
-                    <TabsContent value="voting" className="m-0 h-full">
-                        <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
-                    </TabsContent>
-                    <TabsContent value="review" className="m-0 h-full">
-                        <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
-                    </TabsContent>
-                </div>
-            </div>
-        </Tabs>
-      </div>
+    <div className="h-screen flex bg-background">
+      <nav className="w-64 h-full bg-muted/40 p-4 flex flex-col gap-2">
+        <Link href="/" className={cn(navItemClasses)}>
+            <Home className="h-5 w-5" />
+            <span>Home</span>
+        </Link>
+        <button
+            onClick={() => setActiveView('voting')}
+            className={cn(navItemClasses, activeView === 'voting' && activeNavItemClasses)}
+        >
+            <Vote className="h-5 w-5" />
+            <span>Voting Rooms</span>
+        </button>
+        <button
+            onClick={() => setActiveView('review')}
+            className={cn(navItemClasses, activeView === 'review' && activeNavItemClasses)}
+        >
+            <Star className="h-5 w-5" />
+            <span>Review Rooms</span>
+        </button>
+      </nav>
+      <main className="flex-1 p-6 overflow-hidden">
+        <div className="h-full">
+            {activeView === 'voting' ? (
+                <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
+            ) : (
+                <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
+            )}
+        </div>
+      </main>
+    </div>
   );
 }

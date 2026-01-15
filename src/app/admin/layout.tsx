@@ -7,9 +7,10 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="w-full">
+    // The w-full class is removed from here and managed at the page level
+    // to allow for full-screen layouts like the dashboard.
+    <>
       {children}
-    </div>
+    </>
   );
 }
-
