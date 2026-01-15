@@ -225,21 +225,25 @@ export default function AdminDashboardPage() {
     )
   }
 
+  const navItemClasses = "inline-flex items-center justify-start whitespace-nowrap rounded-sm px-3 py-1.5 text-base font-normal ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-foreground/80 hover:bg-accent hover:text-accent-foreground";
+  const activeNavItemClasses = "bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 hover:text-primary-foreground";
+
+
   return (
     <div className="h-screen flex">
         <Tabs defaultValue="voting" orientation="vertical" className="flex h-full gap-4">
             <TabsList className={cn(
                 "flex flex-col h-full justify-start items-stretch p-2 w-52 bg-muted rounded-none"
             )}>
-                 <Button variant="ghost" asChild className="justify-start gap-2 text-base py-3 px-4 text-foreground/80 hover:bg-accent hover:text-accent-foreground font-normal">
+                 <Button variant="ghost" asChild className={cn(navItemClasses, "gap-2")}>
                     <Link href="/">
                         <Home /> Home
                     </Link>
                 </Button>
-                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 text-foreground/80 hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg font-normal">
+                <TabsTrigger value="voting" className={cn(navItemClasses, "data-[state=active]:" + activeNavItemClasses, "gap-2")}>
                     <Vote /> Voting Rooms
                 </TabsTrigger>
-                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 text-foreground/80 hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg font-normal">
+                <TabsTrigger value="review" className={cn(navItemClasses, "data-[state=active]:" + activeNavItemClasses, "gap-2")}>
                     <Star /> Review Rooms
                 </TabsTrigger>
             </TabsList>
