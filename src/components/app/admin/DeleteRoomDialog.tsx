@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ShieldAlert, Loader2, Eye, EyeOff, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { archiveRoom } from "@/lib/electionRoomService";
+import { deleteRoomPermanently } from "@/lib/electionRoomService";
 
 interface DeleteRoomDialogProps {
   roomId: string;
@@ -33,22 +33,22 @@ export default function DeleteRoomDialog({ roomId, roomTitle, onRoomDeleted }: D
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
-  const handleArchive = async () => {
+  const handleDelete = async () => {
     setIsLoading(true);
-    const result = await archiveRoom(roomId, password);
+    const result = await deleteRoomPermanently(roomId, password);
     setIsLoading(false);
 
     if (result.success) {
       toast({
-        title: "Room Archived",
-        description: `"${roomTitle}" has been moved to the archive.`,
+        title: "Room Deleted",
+        description: `"${roomTitle}" has been permanently deleted.`,
       });
       onRoomDeleted();
       setOpen(false);
     } else {
       toast({
         variant: "destructive",
-        title: "Archive Failed",
+        title: "Deletion Failed",
         description: result.message,
       });
     }
@@ -72,7 +72,7 @@ export default function DeleteRoomDialog({ roomId, roomTitle, onRoomDeleted }: D
         <AlertDialogHeader>
           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action will archive the room, hiding it from the dashboard. You can restore it later from the settings menu.
+            This action is permanent and cannot be undone. This will permanently delete the room and all of its associated data.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-4 py-2">
@@ -80,7 +80,7 @@ export default function DeleteRoomDialog({ roomId, roomTitle, onRoomDeleted }: D
             <ShieldAlert className="h-4 w-4" />
             <AlertTitle>Password Confirmation Required</AlertTitle>
             <AlertDescription>
-                To archive the room <span className="font-bold">"{roomTitle}"</span>, please enter your password.
+                To permanently delete the room <span className="font-bold">"{roomTitle}"</span>, please enter your password.
             </AlertDescription>
           </Alert>
           <div className="space-y-2">
@@ -111,11 +111,11 @@ export default function DeleteRoomDialog({ roomId, roomTitle, onRoomDeleted }: D
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <Button
             variant="destructive"
-            onClick={handleArchive}
+            onClick={handleDelete}
             disabled={isLoading || password.length < 6}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Yes, Archive Room
+            Yes, Delete Room Permanently
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

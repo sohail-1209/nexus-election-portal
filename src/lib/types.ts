@@ -1,10 +1,10 @@
 
 export interface Candidate {
-  id: string;
   name: string;
   imageUrl?: string;
   voteCount?: number; // Optional: for results
   positionTitle?: string; // Optional: for consolidated reports
+  id?: string; // This is now optional and will be removed from most logic
 }
 
 export interface Review {

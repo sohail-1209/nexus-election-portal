@@ -63,7 +63,6 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
     id: p?.id || `pos-${Math.random().toString(36).substr(2, 9)}`,
     title: p?.title || "Untitled Position",
     candidates: (p?.candidates || []).map((c: any) => ({
-      id: c?.id || `cand-${Math.random().toString(36).substr(2, 9)}`,
       name: c?.name || "Unnamed Candidate",
       imageUrl: c?.imageUrl || '',
       voteCount: 0,
@@ -120,21 +119,21 @@ export async function getElectionRoomById(roomId: string, options: { withVoteCou
 
     } else { // 'voting' room type
       const votesSnap = await getDocs(collection(db, "electionRooms", roomId, "votes"));
-      const voteCounts = new Map<string, number>();
-      votesSnap.forEach(voteDoc => {
-        const voteData = voteDoc.data();
-        const candidateId = voteData.candidateId;
-        voteCounts.set(candidateId, (voteCounts.get(candidateId) || 0) + 1);
-      });
       
-      finalPositions = finalPositions.map(position => ({
-        ...position,
-        candidates: position.candidates.map(candidate => ({
-          ...candidate,
-          voteCount: voteCounts.get(candidate.id) || 0,
-          positionTitle: position.title, // Add position title to candidate
-        })),
-      }));
+      finalPositions = finalPositions.map(position => {
+        const candidatesWithVotes = position.candidates.map(candidate => {
+          const candidateVotes = votesSnap.docs.filter(doc => doc.data().candidateName === candidate.name && doc.data().positionId === position.id);
+          return {
+            ...candidate,
+            voteCount: candidateVotes.length
+          };
+        });
+
+        return {
+          ...position,
+          candidates: candidatesWithVotes
+        };
+      });
     }
   }
 
@@ -247,7 +246,7 @@ export async function recordParticipantEntry(
 export async function submitBallot(
   roomId: string,
   voterEmail: string,
-  selections: Record<string, string | null> // positionId -> candidateId | null
+  selections: Record<string, any> // positionId -> candidateName
 ): Promise<{ success: boolean; message: string }> {
   try {
     const voterRef = doc(db, "electionRooms", roomId, "voters", voterEmail);
@@ -262,27 +261,38 @@ export async function submitBallot(
     if (!roomSnap.exists() || roomSnap.data().status !== 'active') {
       return { success: false, message: "This election is not currently active." };
     }
+    
+    const batch = writeBatch(db);
 
-    const votesPromises = [];
     for (const positionId in selections) {
       const candidateId = selections[positionId];
-      if (candidateId) {
-        const voteRef = collection(db, "electionRooms", roomId, "votes");
-        votesPromises.push(addDoc(voteRef, {
-          positionId,
-          candidateId,
-          voterEmail,
-          votedAt: serverTimestamp(),
-        }));
+      if (candidateId) { // Ensure a candidate was selected
+        const roomData = await getElectionRoomById(roomId);
+        if(!roomData) continue;
+
+        const position = roomData.positions.find(p => p.id === positionId);
+        const candidate = position?.candidates.find(c => c.id === candidateId);
+
+        if (position && candidate) {
+            const voteRef = doc(collection(db, "electionRooms", roomId, "votes"));
+            batch.set(voteRef, {
+                positionId: position.id,
+                candidateName: candidate.name, // Store name for counting
+                voterEmail: voterEmail, // For tracking completion, not for tallying
+                votedAt: serverTimestamp(),
+            });
+        }
       }
     }
-    await Promise.all(votesPromises);
     
-    await setDoc(voterRef, {
+    // Mark voter as completed
+    batch.set(voterRef, {
       status: 'completed',
       lastActivity: serverTimestamp(),
       votedAt: serverTimestamp(),
     }, { merge: true });
+
+    await batch.commit();
 
     return { success: true, message: "Your ballot has been successfully submitted." };
   } catch (error: any) {
@@ -310,37 +320,39 @@ export async function submitReview(
       return { success: false, message: "This review room is not currently active." };
     }
 
-    const roomData = roomSnap.data();
-    const positions = roomData.positions || [];
+    const roomData = await getElectionRoomById(roomId);
+    if(!roomData) {
+        return { success: false, message: "Could not find room data."};
+    }
     
-    const reviewPromises = [];
+    const batch = writeBatch(db);
+
     for (const positionId in selections) {
       const reviewData = selections[positionId];
-      const position = positions.find((p: any) => p.id === positionId);
-      const candidateId = position?.candidates[0]?.id;
-
-      if (candidateId) {
-        // Skip submissions if rating is 0 (which means it was skipped by coordinator)
-        if (reviewData.rating === 0) continue;
-
-        const reviewRef = collection(db, "electionRooms", roomId, "reviews");
-        reviewPromises.push(addDoc(reviewRef, {
-          positionId,
-          candidateId,
-          rating: reviewData.rating,
-          feedback: reviewData.feedback,
-          reviewerEmail: voterEmail,
-          reviewedAt: serverTimestamp(),
-        }));
+      // Skip submissions if rating is 0 (which means it was skipped by coordinator)
+      if (reviewData.rating === 0) continue;
+      
+      const position = roomData.positions.find(p => p.id === positionId);
+      if (position && position.candidates[0]) {
+          const reviewRef = doc(collection(db, "electionRooms", roomId, "reviews"));
+          batch.set(reviewRef, {
+              positionId,
+              candidateName: position.candidates[0].name,
+              rating: reviewData.rating,
+              feedback: reviewData.feedback,
+              reviewerEmail: voterEmail,
+              reviewedAt: serverTimestamp(),
+          });
       }
     }
-    await Promise.all(reviewPromises);
     
-    await setDoc(voterRef, {
+    batch.set(voterRef, {
       status: 'completed',
       lastActivity: serverTimestamp(),
       votedAt: serverTimestamp(),
     }, { merge: true });
+
+    await batch.commit();
     
     return { success: true, message: "Your review has been successfully submitted." };
   } catch (error: any) {
@@ -392,7 +404,6 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
                 id: p.id,
                 title: p.title,
                 candidates: p.candidates.map(c => ({
-                  id: c.id,
                   name: c.name,
                   imageUrl: c.imageUrl,
                   voteCount: c.voteCount,
@@ -450,39 +461,47 @@ export async function finalizeAndAnonymizeRoom(roomId: string, adminPassword: st
     }
 }
 
-export async function archiveRoom(roomId: string, adminPassword: string): Promise<{ success: boolean, message: string }> {
+async function deleteSubcollection(batch: any, collectionRef: any) {
+    const snapshot = await getDocs(collectionRef);
+    snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+}
+
+export async function deleteRoomPermanently(roomId: string, adminPassword: string): Promise<{ success: boolean, message: string }> {
     const user = auth.currentUser;
     if (!user || !user.email) {
         return { success: false, message: "Authentication required. Please log in again." };
     }
 
     try {
-        // Re-authenticate for this sensitive action
+        // Re-authenticate for this highly sensitive action
         const credential = EmailAuthProvider.credential(user.email, adminPassword);
         await reauthenticateWithCredential(user, credential);
 
         const roomRef = doc(db, "electionRooms", roomId);
-        
-        // Use a transaction to ensure atomicity
-        await runTransaction(db, async (transaction) => {
-            const roomDoc = await transaction.get(roomRef);
-            if (!roomDoc.exists()) {
-                throw new Error("Room not found.");
-            }
-            // Set status to 'archived'
-            transaction.update(roomRef, { status: 'archived' });
-        });
+        const batch = writeBatch(db);
 
-        return { success: true, message: "Room successfully archived." };
+        // Delete subcollections
+        await deleteSubcollection(batch, collection(db, roomRef.path, 'votes'));
+        await deleteSubcollection(batch, collection(db, roomRef.path, 'voters'));
+        await deleteSubcollection(batch, collection(db, roomRef.path, 'reviews'));
+
+        // Delete the main room document
+        batch.delete(roomRef);
+
+        await batch.commit();
+
+        return { success: true, message: "Room and all its data have been permanently deleted." };
 
     } catch (error: any) {
-        console.error("Archive room error:", error);
+        console.error("Permanent delete room error:", error);
         if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-            return { success: false, message: "Incorrect password. Archiving failed." };
+            return { success: false, message: "Incorrect password. Deletion failed." };
         }
         if (error.code === 'auth/requires-recent-login') {
             return { success: false, message: "This sensitive action requires a recent login. Please log out and back in." };
         }
-        return { success: false, message: error.message || "An unexpected error occurred during archiving." };
+        return { success: false, message: error.message || "An unexpected error occurred during deletion." };
     }
 }
