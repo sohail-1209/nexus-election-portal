@@ -41,7 +41,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Header />
-          <main className="flex-grow container">
+          <main className="flex-grow">
             {children}
           </main>
           <Footer />
