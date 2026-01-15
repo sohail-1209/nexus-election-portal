@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {[1, 2].map(i => (
           <Card key={i} className="h-[70vh]">
@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
   
   if (error) {
     return (
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
                 <CardHeader className="text-center">
                 <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
@@ -225,40 +225,41 @@ export default function AdminDashboardPage() {
     )
   }
   
-  const navItemClasses = "relative flex items-center gap-3 px-4 py-3 text-muted-foreground font-medium rounded-lg transition-colors hover:text-primary hover:bg-primary/10";
-  const activeNavItemClasses = "text-primary bg-primary/10 after:content-[''] after:absolute after:right-0 after:top-1/2 after:-translate-y-1/2 after:h-2/3 after:w-1 after:bg-primary after:rounded-l-lg";
+  const navItemClasses = "flex items-center gap-3 justify-start px-4 py-3 text-muted-foreground font-medium rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground";
+  const activeNavItemClasses = "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground";
 
   return (
-    <div className="h-screen flex bg-background">
-      <nav className="w-64 h-full bg-muted/40 p-4 flex flex-col gap-2">
-        <Link href="/" className={cn(navItemClasses)}>
-            <Home className="h-5 w-5" />
-            <span>Home</span>
-        </Link>
-        <button
-            onClick={() => setActiveView('voting')}
-            className={cn(navItemClasses, activeView === 'voting' && activeNavItemClasses)}
-        >
-            <Vote className="h-5 w-5" />
-            <span>Voting Rooms</span>
-        </button>
-        <button
-            onClick={() => setActiveView('review')}
-            className={cn(navItemClasses, activeView === 'review' && activeNavItemClasses)}
-        >
-            <Star className="h-5 w-5" />
-            <span>Review Rooms</span>
-        </button>
-      </nav>
-      <main className="flex-1 p-6 overflow-hidden">
-        <div className="h-full">
-            {activeView === 'voting' ? (
-                <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
-            ) : (
-                <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
-            )}
-        </div>
-      </main>
+    <div className="flex h-screen bg-background">
+        <nav className="w-64 flex-shrink-0 bg-muted/40 p-4 flex flex-col gap-2 border-r">
+             <div className="font-bold text-lg p-4 mb-2">N.E.X.U.S Board</div>
+            <Link href="/" className={cn(navItemClasses)}>
+                <Home className="h-5 w-5" />
+                <span>Home</span>
+            </Link>
+            <button
+                onClick={() => setActiveView('voting')}
+                className={cn(navItemClasses, activeView === 'voting' && activeNavItemClasses)}
+            >
+                <Vote className="h-5 w-5" />
+                <span>Voting Rooms</span>
+            </button>
+            <button
+                onClick={() => setActiveView('review')}
+                className={cn(navItemClasses, activeView === 'review' && activeNavItemClasses)}
+            >
+                <Star className="h-5 w-5" />
+                <span>Review Rooms</span>
+            </button>
+        </nav>
+        <main className="flex-1 p-6 overflow-hidden">
+            <div className="h-full">
+                {activeView === 'voting' ? (
+                    <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
+                ) : (
+                    <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
+                )}
+            </div>
+        </main>
     </div>
   );
 }
