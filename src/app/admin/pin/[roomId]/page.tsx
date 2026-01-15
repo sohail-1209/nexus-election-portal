@@ -8,8 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { getElectionRoomById, pinResultsToHome } from "@/lib/electionRoomService";
-import type { ElectionRoom, LeadershipRole } from "@/lib/types";
+import { getElectionRoomById, pinResultsToHome, getLatestTerm } from "@/lib/electionRoomService";
+import type { ElectionRoom, LeadershipRole, Term } from "@/lib/types";
 import { clubAuthorities } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,8 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, CalendarIcon, Loader2, Pin, AlertTriangle } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { ArrowLeft, CalendarIcon, Loader2, Pin, AlertTriangle, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { format, add } from "date-fns";
@@ -78,6 +79,9 @@ export default function PinToHomePage() {
   const [room, setRoom] = useState<ElectionRoom | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showTermAlert, setShowTermAlert] = useState(false);
+  const [formValues, setFormValues] = useState<PinFormValues | null>(null);
   
   const form = useForm<PinFormValues>({
     resolver: zodResolver(pinFormSchema),
@@ -141,23 +145,25 @@ export default function PinToHomePage() {
 
     return () => unsubscribe();
   }, [roomId, router, form]);
-
-  const onSubmit = async (values: PinFormValues) => {
-    if (!room) return;
-
+  
+  const handleFinalSubmission = async (isNewTerm: boolean) => {
+    if (!room || !formValues) return;
+    setIsSubmitting(true);
+    
     const termData = {
-        startDate: values.startDate.toISOString(),
-        endDate: values.endDate.toISOString(),
-        roles: values.roles,
+        startDate: formValues.startDate.toISOString(),
+        endDate: formValues.endDate.toISOString(),
+        roles: formValues.roles,
         sourceRoomId: room.id,
         sourceRoomTitle: room.title,
     };
     
-    const result = await pinResultsToHome(termData);
+    const result = await pinResultsToHome(termData, isNewTerm);
+    
     if(result.success) {
         toast({
             title: "Results Pinned!",
-            description: "The leadership structure has been published to the home dashboard.",
+            description: result.message,
         });
         router.push('/admin/dashboard');
     } else {
@@ -167,6 +173,27 @@ export default function PinToHomePage() {
             description: result.message,
         });
     }
+    setIsSubmitting(false);
+  }
+
+  const onSubmit = async (values: PinFormValues) => {
+    setFormValues(values);
+
+    const latestTerm = await getLatestTerm();
+    
+    if (latestTerm) {
+        const formStart = values.startDate.setHours(0,0,0,0);
+        const formEnd = values.endDate.setHours(0,0,0,0);
+        const termStart = new Date(latestTerm.startDate).setHours(0,0,0,0);
+        const termEnd = new Date(latestTerm.endDate).setHours(0,0,0,0);
+
+        if (formStart !== termStart || formEnd !== termEnd) {
+            setShowTermAlert(true);
+            return;
+        }
+    }
+    
+    await handleFinalSubmission(false); // Same dates or no existing term, so merge.
   }
 
   if (loading) {
@@ -309,16 +336,44 @@ export default function PinToHomePage() {
                 </div>
               </div>
 
-              <Button type="submit" size="lg" className="w-full" disabled={form.formState.isSubmitting}>
-                {form.formState.isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Pin className="mr-2 h-5 w-5" />}
+              <Button type="submit" size="lg" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Pin className="mr-2 h-5 w-5" />}
                 Confirm and Publish to Dashboard
               </Button>
             </CardContent>
           </Card>
         </form>
       </Form>
+      
+       <AlertDialog open={showTermAlert} onOpenChange={setShowTermAlert}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New Leadership Term?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <Alert variant="destructive" className="mt-4">
+                  <ShieldAlert className="h-4 w-4" />
+                  <AlertTitle>Warning!</AlertTitle>
+                  <AlertDescription>
+                    The term dates you've selected are different from the currently active term. Continuing will **clear all existing positions** from the dashboard and create a new term.
+                  </AlertDescription>
+              </Alert>
+               <div className="mt-4 text-sm">
+                This action cannot be undone. Do you wish to proceed?
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setFormValues(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleFinalSubmission(true)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Yes, Create New Term
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
-
-    

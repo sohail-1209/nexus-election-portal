@@ -1,8 +1,8 @@
 
 import { db, auth } from "@/lib/firebaseClient";
-import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp, limit } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position, FinalizedResults, Term } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, FinalizedResults, Term, LeadershipRole } from '@/lib/types';
 
 
 export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
@@ -489,21 +489,74 @@ export async function deleteRoomPermanently(roomId: string, adminPassword: strin
     }
 }
 
-export async function pinResultsToHome(termData: Omit<Term, 'id' | 'createdAt'>): Promise<{ success: boolean; message: string, termId?: string }> {
+export async function pinResultsToHome(
+    termData: Omit<Term, 'id' | 'createdAt'>,
+    isNewTerm: boolean
+): Promise<{ success: boolean; message: string, termId?: string }> {
     try {
-        const termRef = await addDoc(collection(db, 'terms'), {
-            ...termData,
-            createdAt: serverTimestamp()
-        });
-
         const roomRef = doc(db, 'electionRooms', termData.sourceRoomId);
-        await updateDoc(roomRef, {
-            pinnedToTerm: true
-        });
+        
+        if (isNewTerm) {
+            // Create a new term, replacing any old one.
+            const newTermRef = await addDoc(collection(db, 'terms'), {
+                ...termData,
+                createdAt: serverTimestamp()
+            });
+            await updateDoc(roomRef, { pinnedToTerm: true });
+            return { success: true, message: 'New leadership term has been published to the dashboard.', termId: newTermRef.id };
+        } else {
+            // Merge with the most recent existing term.
+            const termsCollection = collection(db, 'terms');
+            const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
+            const termSnapshot = await getDocs(q);
 
-        return { success: true, message: 'Leadership term has been published to the dashboard.', termId: termRef.id };
+            if (termSnapshot.empty) {
+                // If no term exists, create a new one anyway.
+                const newTermRef = await addDoc(collection(db, 'terms'), { ...termData, createdAt: serverTimestamp() });
+                await updateDoc(roomRef, { pinnedToTerm: true });
+                return { success: true, message: 'Leadership term has been published to the dashboard.', termId: newTermRef.id };
+            }
+
+            const existingTermDoc = termSnapshot.docs[0];
+            const existingTermData = existingTermDoc.data() as Term;
+
+            // Create a map of existing roles for easy lookup.
+            const existingRolesMap = new Map(existingTermData.roles.map(role => [role.positionTitle, role]));
+
+            // Merge new roles, overwriting duplicates.
+            termData.roles.forEach(newRole => {
+                existingRolesMap.set(newRole.positionTitle, newRole);
+            });
+
+            const mergedRoles = Array.from(existingRolesMap.values());
+
+            await updateDoc(existingTermDoc.ref, { roles: mergedRoles });
+            await updateDoc(roomRef, { pinnedToTerm: true });
+
+            return { success: true, message: 'Leadership roles have been merged into the current term.', termId: existingTermDoc.id };
+        }
     } catch (error) {
         console.error("Error pinning results to home:", error);
         return { success: false, message: 'An unexpected error occurred while publishing the term.' };
+    }
+}
+
+
+export async function getLatestTerm(): Promise<Term | null> {
+    try {
+        const termsCollection = collection(db, 'terms');
+        const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
+        const termSnapshot = await getDocs(q);
+
+        if (termSnapshot.empty) {
+            return null;
+        }
+        
+        const termDoc = termSnapshot.docs[0];
+        return { id: termDoc.id, ...termDoc.data() } as Term;
+
+    } catch (error) {
+        console.error("Error fetching latest term:", error);
+        return null;
     }
 }
