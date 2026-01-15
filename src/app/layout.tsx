@@ -1,7 +1,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import Header from '@/components/app/Header';
+import ClientHeader from '@/components/app/ClientHeader';
 import Footer from '@/components/app/Footer';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/app/ThemeProvider';
@@ -40,7 +40,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Header />
+          <ClientHeader />
           <main className="flex-grow">
             {children}
           </main>
