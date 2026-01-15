@@ -201,7 +201,7 @@ export async function recordParticipantEntry(
     voterEmail: string,
     ownPositionTitle: string
 ): Promise<{ success: boolean; message: string }> {
-    const clubAuthorities = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
+    const clubAuthorities = ["President", "Vice President", "Vice-President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
     const clubOperationTeam = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "Assistant Secretary"];
     
     const isRestrictedRole = clubAuthorities.includes(ownPositionTitle) || clubOperationTeam.includes(ownPositionTitle);
@@ -615,4 +615,71 @@ export async function updateTermRoles(updatedRoles: LeadershipRole[]): Promise<{
         return { success: false, message: 'An unexpected error occurred while updating the leadership structure.' };
     }
 }
+
+// ==============
+// Club Roles Management
+// ==============
+
+const rolesCollectionRef = collection(db, 'clubRoles');
+
+export async function getClubRoles(): Promise<{ id: string; title: string; type: 'Authority' | 'Lead' }[]> {
+  try {
+    const snapshot = await getDocs(query(rolesCollectionRef, orderBy('title')));
+    if (snapshot.empty) {
+        // Here you could seed initial roles if you wanted
+        return [];
+    }
+    return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+  } catch (error) {
+    console.error("Error fetching club roles:", error);
+    return [];
+  }
+}
+
+export async function updateClubRoles(roles: { title: string; type: 'Authority' | 'Lead' }[]): Promise<{ success: boolean; message: string }> {
+    try {
+        const batch = writeBatch(db);
+        
+        // Get current roles to find out which to delete
+        const currentRolesSnap = await getDocs(rolesCollectionRef);
+        const currentRoles = currentRolesSnap.docs.map(d => d.data().title);
+        const newRoles = roles.map(r => r.title);
+
+        const rolesToDelete = currentRoles.filter(r => !newRoles.includes(r));
+        
+        currentRolesSnap.docs.forEach(doc => {
+            if (rolesToDelete.includes(doc.data().title)) {
+                batch.delete(doc.ref);
+            }
+        });
+
+        // Add or update roles
+        for (const role of roles) {
+            // Use role title as the document ID for simplicity and uniqueness
+            const roleRef = doc(db, 'clubRoles', role.title.toLowerCase().replace(/\s+/g, '-'));
+            batch.set(roleRef, role, { merge: true });
+        }
+
+        await batch.commit();
+
+        // Also, update the current leadership term to reflect role changes
+        const latestTerm = await getLatestTerm();
+        if(latestTerm) {
+            const termHolderMap = new Map(latestTerm.roles.map(r => [r.positionTitle, r.holderName]));
+            const newTermRoles: LeadershipRole[] = roles.map(role => ({
+                id: role.title.replace(/\s+/g, '-'),
+                positionTitle: role.title,
+                holderName: termHolderMap.get(role.title) || '',
+                roleType: role.type,
+            }));
+            await updateDoc(doc(db, 'terms', latestTerm.id), { roles: newTermRoles });
+        }
+
+        return { success: true, message: 'Club roles updated successfully.' };
+    } catch (error) {
+        console.error("Error updating club roles:", error);
+        return { success: false, message: 'Failed to update club roles.' };
+    }
+}
+
     

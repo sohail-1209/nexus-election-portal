@@ -71,3 +71,12 @@ export interface Term {
     sourceRoomId: string;
     sourceRoomTitle: string;
 }
+
+// New type for dynamic club roles
+export interface ClubRole {
+    id: string;
+    title: string;
+    type: 'Authority' | 'Lead';
+}
+
+    

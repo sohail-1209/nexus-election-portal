@@ -5,10 +5,8 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseClient";
-import { getElectionRoomsAndGroups } from "@/lib/electionRoomService";
+import { getElectionRoomsAndGroups, getLatestTerm, getClubRoles } from "@/lib/electionRoomService";
 import type { ElectionRoom, Term, LeadershipRole } from "@/lib/types";
-import { collection, getDocs, limit, orderBy, query, onSnapshot } from 'firebase/firestore';
-import { clubAuthorities, clubOperationTeam } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,7 +19,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
-import ClearTermDialog from "@/components/app/admin/ClearTermDialog";
 
 
 function LeadershipSkeleton() {
@@ -83,64 +80,51 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
 
 function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
   const [term, setTerm] = useState<Term | null>(null);
+  const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead'}[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchLatestTerm = useCallback(async () => {
+  const fetchLeadershipData = useCallback(async () => {
     setLoading(true);
     try {
-      const termsCollection = collection(db, 'terms');
-      const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
-      const unsubscribe = onSnapshot(q, (termSnapshot) => {
-        if (!termSnapshot.empty) {
-          const termDoc = termSnapshot.docs[0];
-          setTerm({ id: termDoc.id, ...termDoc.data() } as Term);
-        } else {
-          setTerm(null);
-        }
-        setLoading(false);
-      });
-      return unsubscribe;
+        const [latestTerm, roles] = await Promise.all([getLatestTerm(), getClubRoles()]);
+        setTerm(latestTerm);
+        setClubRoles(roles);
     } catch (error) {
-      console.error("Error fetching latest term:", error);
+      console.error("Error fetching leadership data:", error);
+    } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-    fetchLatestTerm().then(unsub => { unsubscribe = unsub });
-    return () => {
-        if(unsubscribe) {
-            unsubscribe();
-        }
-    };
-  }, [fetchLatestTerm]);
+    fetchLeadershipData();
+  }, [fetchLeadershipData, onTermCleared]);
 
   const leadershipRoles = useMemo(() => {
       const pinnedRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));
       
-      const authorities = clubAuthorities.map(title => ({
-          title,
-          holderName: pinnedRoles.get(title),
+      const authorities = clubRoles.filter(r => r.type === 'Authority').map(role => ({
+          title: role.title,
+          holderName: pinnedRoles.get(role.title),
           roleType: 'Authority' as const
       }));
 
-      const leads = clubOperationTeam.map(title => ({
-          title,
-          holderName: pinnedRoles.get(title),
+      const leads = clubRoles.filter(r => r.type === 'Lead').map(role => ({
+          title: role.title,
+          holderName: pinnedRoles.get(role.title),
           roleType: 'Lead' as const
       }));
 
       return { authorities, leads };
 
-  }, [term]);
+  }, [term, clubRoles]);
 
 
   if (loading) {
     return <LeadershipSkeleton />;
   }
 
-  if (!term) {
+  if (!term && clubRoles.length === 0) {
     return (
       <div className="text-center p-6">
         <Card className="max-w-2xl mx-auto">
@@ -148,7 +132,7 @@ function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
                 <Users className="h-16 w-16 mx-auto text-muted-foreground" />
                 <CardTitle className="mt-4">No Leadership Term Published</CardTitle>
                 <CardDescription className="mt-2">
-                    There is currently no active leadership term published on the dashboard. Please complete an election and use the "Pin Results to Home" feature to publish the new leadership structure.
+                    There is currently no active leadership term published. Please use the "Pin Results to Home" feature in a finalized election room or use the "Edit Leadership" setting to create one.
                 </CardDescription>
             </CardHeader>
         </Card>
@@ -160,37 +144,45 @@ function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
     <div className="space-y-10 p-6">
         <header className="text-center">
             <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
-            <p className="text-muted-foreground mt-2 text-lg">
-                Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
-            </p>
+            {term && (
+                 <p className="text-muted-foreground mt-2 text-lg">
+                    Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
+                </p>
+            )}
              <div className="flex justify-center items-center gap-6 mt-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
-                </div>
+                {term && (
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
+                    </div>
+                )}
             </div>
         </header>
 
         
-        <section>
-            <div className="flex items-center gap-3 mb-4">
-                <Shield className="h-7 w-7 text-primary" />
-                <h2 className="text-3xl font-semibold">Authorities</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {leadershipRoles.authorities.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
-            </div>
-        </section>
+        {leadershipRoles.authorities.length > 0 && (
+            <section>
+                <div className="flex items-center gap-3 mb-4">
+                    <Shield className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Authorities</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {leadershipRoles.authorities.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
+                </div>
+            </section>
+        )}
 
-        <section>
-             <div className="flex items-center gap-3 mb-4">
-                <Star className="h-7 w-7 text-primary" />
-                <h2 className="text-3xl font-semibold">Leads</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {leadershipRoles.leads.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
-            </div>
-        </section>
+        {leadershipRoles.leads.length > 0 && (
+            <section>
+                 <div className="flex items-center gap-3 mb-4">
+                    <Star className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Leads</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {leadershipRoles.leads.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
+                </div>
+            </section>
+        )}
         
     </div>
   );

@@ -19,30 +19,29 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldAlert, Loader2, Eye, EyeOff, Save, Edit } from "lucide-react";
+import { ShieldAlert, Loader2, Eye, EyeOff, Save, Edit, PlusCircle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getLatestTerm, updateTermRoles } from "@/lib/electionRoomService";
+import { getLatestTerm, updateTermRoles, getClubRoles, updateClubRoles } from "@/lib/electionRoomService";
 import { auth } from "@/lib/firebaseClient";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
-import { clubAuthorities, clubOperationTeam } from "@/lib/roles";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { LeadershipRole, Term } from "@/lib/types";
+import type { LeadershipRole } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const leadershipRoleSchema = z.object({
+
+const roleManagementSchema = z.object({
+  roles: z.array(z.object({
     id: z.string(),
-    positionTitle: z.string(),
-    holderName: z.string(),
-    roleType: z.enum(['Authority', 'Lead']),
+    title: z.string().min(1, "Title is required."),
+    type: z.enum(['Authority', 'Lead']),
+  })),
+  newRoleTitle: z.string().optional(),
+  newRoleType: z.enum(['Authority', 'Lead']).optional(),
 });
 
-const termEditSchema = z.object({
-  roles: z.array(leadershipRoleSchema),
-});
-
-type TermEditFormValues = z.infer<typeof termEditSchema>;
-
+type RoleManagementFormValues = z.infer<typeof roleManagementSchema>;
 
 interface EditTermDialogProps {
     onTermUpdated: () => void;
@@ -71,39 +70,28 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
   const [showPassword, setShowPassword] = useState(false);
   const { toast } = useToast();
 
-  const form = useForm<TermEditFormValues>({
-    resolver: zodResolver(termEditSchema),
+  const form = useForm<RoleManagementFormValues>({
+    resolver: zodResolver(roleManagementSchema),
     defaultValues: {
       roles: [],
+      newRoleTitle: "",
+      newRoleType: "Lead",
     },
   });
 
-  const { fields } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
       control: form.control,
       name: "roles"
   });
 
-  const loadTermData = async () => {
+  const loadRoleData = async () => {
     setIsFormLoading(true);
-    const term = await getLatestTerm();
-    const existingRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));
-
-    const allRoles: LeadershipRole[] = [
-        ...clubAuthorities.map(title => ({
-            id: title.replace(/\s+/g, '-'),
-            positionTitle: title,
-            holderName: existingRoles.get(title) || '',
-            roleType: 'Authority' as const
-        })),
-        ...clubOperationTeam.map(title => ({
-            id: title.replace(/\s+/g, '-'),
-            positionTitle: title,
-            holderName: existingRoles.get(title) || '',
-            roleType: 'Lead' as const
-        })),
-    ];
-    
-    form.reset({ roles: allRoles });
+    const clubRoles = await getClubRoles();
+    form.reset({ 
+        roles: clubRoles.map(r => ({ id: r.id || r.title, title: r.title, type: r.type })),
+        newRoleTitle: "",
+        newRoleType: "Lead"
+    });
     setIsFormLoading(false);
   }
 
@@ -118,7 +106,7 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
     try {
       await reauthenticateWithCredential(user, credential);
       setIsAuthenticated(true);
-      await loadTermData();
+      await loadRoleData();
     } catch (error) {
       toast({
         variant: "destructive",
@@ -129,13 +117,31 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
       setIsLoading(false);
     }
   };
+  
+  const handleAddNewRole = () => {
+    const newTitle = form.getValues("newRoleTitle");
+    const newType = form.getValues("newRoleType");
+    if (newTitle && newType) {
+        if (fields.some(field => field.title.toLowerCase() === newTitle.toLowerCase())) {
+            toast({ variant: "destructive", title: "Duplicate Role", description: "This role title already exists."});
+            return;
+        }
+        append({ id: newTitle, title: newTitle, type: newType });
+        form.setValue("newRoleTitle", "");
+        form.setValue("newRoleType", "Lead");
+    }
+  }
 
-  const onSubmit = async (values: TermEditFormValues) => {
+  const onSubmit = async (values: RoleManagementFormValues) => {
       setIsLoading(true);
-      const result = await updateTermRoles(values.roles);
+      
+      const newRolesForDb = values.roles.map(r => ({ title: r.title, type: r.type }));
+      
+      const result = await updateClubRoles(newRolesForDb);
+
       if(result.success) {
-          toast({ title: "Success", description: result.message });
-          onTermUpdated();
+          toast({ title: "Success", description: "Club roles have been updated." });
+          onTermUpdated(); // This will trigger a refresh on the dashboard
           setOpen(false);
       } else {
           toast({ variant: "destructive", title: "Error", description: result.message });
@@ -149,17 +155,18 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
       setPassword("");
       setIsAuthenticated(false);
       setIsLoading(false);
+      setIsFormLoading(false);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Edit Leadership Structure</DialogTitle>
+          <DialogTitle>Manage Club Roles</DialogTitle>
           <DialogDescription>
-            {isAuthenticated ? "Update the names for each leadership position." : "Enter your password to modify the current leadership term."}
+            {isAuthenticated ? "Add, remove, or edit the official roles for the club." : "Enter your password to manage club roles."}
           </DialogDescription>
         </DialogHeader>
         {!isAuthenticated ? (
@@ -207,22 +214,58 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
                     <ScrollArea className="h-96 pr-4 -mr-4">
                         {isFormLoading ? <EditTermFormSkeleton /> : (
                             <div className="space-y-4">
-                                {fields.map((field, index) => (
-                                    <FormField
-                                        key={field.id}
-                                        control={form.control}
-                                        name={`roles.${index}.holderName`}
-                                        render={({ field: formField }) => (
-                                            <FormItem>
-                                                <FormLabel>{field.positionTitle}</FormLabel>
-                                                <FormControl>
-                                                    <Input placeholder="Enter holder's name" {...formField} />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                ))}
+                                <div>
+                                    <h4 className="font-medium mb-2">Existing Roles</h4>
+                                    {fields.map((field, index) => (
+                                        <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md mb-2">
+                                            <div className="flex-grow">
+                                                <p className="font-semibold">{field.title}</p>
+                                                <p className="text-xs text-muted-foreground">{field.type}</p>
+                                            </div>
+                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(index)}>
+                                                <Trash2 className="h-4 w-4"/>
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="space-y-2 p-3 border-t">
+                                     <h4 className="font-medium">Add New Role</h4>
+                                     <div className="flex gap-2">
+                                         <FormField
+                                            control={form.control}
+                                            name="newRoleTitle"
+                                            render={({ field }) => (
+                                                <FormItem className="flex-grow">
+                                                    <FormControl>
+                                                        <Input placeholder="New position title" {...field} />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="newRoleType"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <Select onValueChange={field.onChange} value={field.value}>
+                                                        <FormControl>
+                                                            <SelectTrigger>
+                                                                <SelectValue/>
+                                                            </SelectTrigger>
+                                                        </FormControl>
+                                                        <SelectContent>
+                                                            <SelectItem value="Authority">Authority</SelectItem>
+                                                            <SelectItem value="Lead">Lead</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </FormItem>
+                                            )}
+                                        />
+                                     </div>
+                                      <Button type="button" variant="outline" size="sm" className="w-full" onClick={handleAddNewRole}>
+                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Role
+                                      </Button>
+                                </div>
                             </div>
                         )}
                     </ScrollArea>
@@ -230,7 +273,7 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
                          <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                         <Button type="submit" disabled={isLoading || isFormLoading}>
                             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            Save Changes
+                            Save All Changes
                         </Button>
                     </DialogFooter>
                 </form>
@@ -240,3 +283,5 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
     </Dialog>
   );
 }
+
+    

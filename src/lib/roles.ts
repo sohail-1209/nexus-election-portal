@@ -1,4 +1,9 @@
 
+// This file is now deprecated for providing the master list of roles.
+// Roles are now managed dynamically in the 'clubRoles' collection in Firestore.
+// These arrays are kept for now to support legacy functionality and can be
+// used as a fallback or for initial seeding.
+
 export const facultyRoles = ["Coordinator"];
 
 export const clubAuthorities = [
@@ -38,6 +43,5 @@ export const allElectionRoles = [
     ...generalClubRoles.filter(r => r !== 'Other'), // Add general roles, exclude duplicate 'Other'
     "Other" // Keep other for custom roles
 ];
-
 
     

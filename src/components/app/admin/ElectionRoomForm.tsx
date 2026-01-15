@@ -28,8 +28,7 @@ import { storage, db } from "@/lib/firebaseClient";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc, addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { allElectionRoles } from "@/lib/roles";
-
+import { getClubRoles } from "@/lib/electionRoomService";
 
 const candidateSchema = z.object({
   id: z.string().optional(), 
@@ -84,6 +83,7 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isFormMounted, setIsFormMounted] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
 
   const form = useForm<ElectionRoomFormValues>({
     resolver: zodResolver(electionRoomFormSchema),
@@ -91,20 +91,17 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
       title: initialData.title || "",
       description: initialData.description || "",
       status: initialData.status || "pending",
-      positions: (initialData.positions || []).map(p => {
-        const isCustom = !allElectionRoles.includes(p.title);
-        return {
+      positions: (initialData.positions || []).map(p => ({
             id: p.id,
-            title: isCustom ? 'Other' : p.title || "",
-            customTitle: isCustom ? p.title : "",
+            title: p.title || "",
+            customTitle: "", // This will be adjusted based on available roles
             candidates: (p.candidates || []).map(c => ({
               id: c.id,
               name: c.name || "",
               imageUrl: c.imageUrl || "",
               voteCount: c.voteCount || 0,
             })),
-        }
-      }),
+        })),
     } : {
       title: "",
       description: "",
@@ -113,6 +110,28 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
     },
   });
   
+  useEffect(() => {
+    async function fetchRoles() {
+        const roles = await getClubRoles();
+        const roleTitles = roles.map(r => r.title);
+        setAvailableRoles(roleTitles);
+
+        if (initialData) {
+            const adjustedPositions = (initialData.positions || []).map(p => {
+                const isCustom = !roleTitles.includes(p.title);
+                return {
+                    id: p.id,
+                    title: isCustom ? 'Other' : p.title,
+                    customTitle: isCustom ? p.title : "",
+                    candidates: p.candidates || [],
+                };
+            });
+            form.setValue('positions', adjustedPositions);
+        }
+    }
+    fetchRoles();
+  }, [initialData]);
+
   const { fields: positionFields, append: appendPosition, remove: removePosition } = useFieldArray({
     control: form.control,
     name: "positions",
@@ -280,6 +299,7 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
               form={form}
               initialData={initialData}
               isOnlyPosition={positionFields.length <= 1}
+              availableRoles={availableRoles}
             />
           ))}
           <Button
@@ -329,9 +349,10 @@ interface PositionCardProps {
   form: any;
   initialData?: ElectionRoom;
   isOnlyPosition: boolean;
+  availableRoles: string[];
 }
 
-function PositionCard({ positionIndex, removePosition, form, initialData, isOnlyPosition }: PositionCardProps) {
+function PositionCard({ positionIndex, removePosition, form, initialData, isOnlyPosition, availableRoles }: PositionCardProps) {
   const { control, watch } = form;
   const positionTitleValue = watch(`positions.${positionIndex}.title`);
 
@@ -372,9 +393,10 @@ function PositionCard({ positionIndex, removePosition, form, initialData, isOnly
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {allElectionRoles.map(role => (
+                        {availableRoles.map(role => (
                           <SelectItem key={role} value={role}>{role}</SelectItem>
                         ))}
+                        <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   <FormMessage />
@@ -573,3 +595,5 @@ function CandidateFields({ positionIndex, control, form, roomType }: CandidateFi
     </div>
   );
 }
+
+    

@@ -1,15 +1,15 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 import { db } from '@/lib/firebaseClient';
 import type { Term, LeadershipRole } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Users, Crown, Shield, Star, Calendar, Clock } from 'lucide-react';
+import { Users, Crown, Shield, Star, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
-import { clubAuthorities, clubOperationTeam } from "@/lib/roles";
+import { getClubRoles, getLatestTerm } from '@/lib/electionRoomService';
 
 function LeadershipSkeleton() {
     return (
@@ -70,46 +70,43 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
 
 export default function HomePage() {
   const [term, setTerm] = useState<Term | null>(null);
+  const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead'}[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchLatestTerm = async () => {
-      try {
-        const termsCollection = collection(db, 'terms');
-        const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
-        const termSnapshot = await getDocs(q);
-
-        if (!termSnapshot.empty) {
-          const termDoc = termSnapshot.docs[0];
-          setTerm({ id: termDoc.id, ...termDoc.data() } as Term);
-        }
-      } catch (error) {
-        console.error("Error fetching latest term:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchLatestTerm();
+  const fetchLeadershipData = useCallback(async () => {
+    setLoading(true);
+    try {
+        const [latestTerm, roles] = await Promise.all([getLatestTerm(), getClubRoles()]);
+        setTerm(latestTerm);
+        setClubRoles(roles);
+    } catch (error) {
+      console.error("Error fetching leadership data:", error);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLeadershipData();
+  }, [fetchLeadershipData]);
 
   const leadershipRoles = useMemo(() => {
       const pinnedRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));
       
-      const authorities = clubAuthorities.map(title => ({
-          title,
-          holderName: pinnedRoles.get(title),
+      const authorities = clubRoles.filter(r => r.type === 'Authority').map(role => ({
+          title: role.title,
+          holderName: pinnedRoles.get(role.title),
           roleType: 'Authority' as const
       }));
 
-      const leads = clubOperationTeam.map(title => ({
-          title,
-          holderName: pinnedRoles.get(title),
+      const leads = clubRoles.filter(r => r.type === 'Lead').map(role => ({
+          title: role.title,
+          holderName: pinnedRoles.get(role.title),
           roleType: 'Lead' as const
       }));
 
       return { authorities, leads };
-
-  }, [term]);
+  }, [term, clubRoles]);
 
   if (loading) {
     return (
@@ -119,7 +116,7 @@ export default function HomePage() {
     );
   }
 
-  if (!term) {
+  if (!term && clubRoles.length === 0) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
         <Card className="max-w-2xl mx-auto">
@@ -127,7 +124,7 @@ export default function HomePage() {
                 <Users className="h-16 w-16 mx-auto text-muted-foreground" />
                 <CardTitle className="mt-4">No Leadership Term Published</CardTitle>
                 <CardDescription className="mt-2">
-                    There is currently no active leadership term published on the dashboard. Please check back later.
+                    There is currently no active leadership term published. Please check back later.
                 </CardDescription>
             </CardHeader>
         </Card>
@@ -139,37 +136,45 @@ export default function HomePage() {
     <div className="container mx-auto py-8 px-4 space-y-10">
         <header className="text-center">
             <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
-            <p className="text-muted-foreground mt-2 text-lg">
-                Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
-            </p>
-            <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-6 mt-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
+            {term && (
+                <p className="text-muted-foreground mt-2 text-lg">
+                    Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
+                </p>
+            )}
+            {term && (
+                <div className="flex flex-col sm:flex-row justify-center items-center gap-4 sm:gap-6 mt-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
+                    </div>
                 </div>
-            </div>
+            )}
         </header>
 
         
-        <section>
-            <div className="flex items-center gap-3 mb-4">
-                <Shield className="h-7 w-7 text-primary" />
-                <h2 className="text-3xl font-semibold">Authorities</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {leadershipRoles.authorities.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
-            </div>
-        </section>
+        {leadershipRoles.authorities.length > 0 && (
+            <section>
+                <div className="flex items-center gap-3 mb-4">
+                    <Shield className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Authorities</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {leadershipRoles.authorities.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
+                </div>
+            </section>
+        )}
 
-        <section>
-             <div className="flex items-center gap-3 mb-4">
-                <Star className="h-7 w-7 text-primary" />
-                <h2 className="text-3xl font-semibold">Leads</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {leadershipRoles.leads.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
-            </div>
-        </section>
+        {leadershipRoles.leads.length > 0 && (
+            <section>
+                 <div className="flex items-center gap-3 mb-4">
+                    <Star className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Leads</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {leadershipRoles.leads.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
+                </div>
+            </section>
+        )}
         
     </div>
   );
