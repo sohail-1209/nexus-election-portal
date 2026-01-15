@@ -10,6 +10,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { getElectionRoomById, pinResultsToHome } from "@/lib/electionRoomService";
 import type { ElectionRoom, LeadershipRole } from "@/lib/types";
+import { clubAuthorities } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -110,8 +111,6 @@ export default function PinToHomePage() {
           }
           setRoom(roomData);
 
-          const authorityTitles = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
-
           const roles: LeadershipRole[] = (roomData.finalizedResults?.positions || []).map(p => {
              const maxVotes = Math.max(...(p.candidates.map(c => c.voteCount || 0)));
              const winner = p.candidates.find(c => c.voteCount === maxVotes && maxVotes > 0);
@@ -119,7 +118,7 @@ export default function PinToHomePage() {
                  id: p.id,
                  positionTitle: p.title,
                  holderName: winner?.name || '',
-                 roleType: authorityTitles.includes(p.title) ? 'Authority' : 'Lead',
+                 roleType: clubAuthorities.includes(p.title) ? 'Authority' : 'Lead',
              };
           });
 
@@ -160,7 +159,7 @@ export default function PinToHomePage() {
             title: "Results Pinned!",
             description: "The leadership structure has been published to the home dashboard.",
         });
-        router.push('/');
+        router.push('/admin/dashboard');
     } else {
         toast({
             variant: "destructive",
@@ -321,3 +320,5 @@ export default function PinToHomePage() {
     </div>
   );
 }
+
+    

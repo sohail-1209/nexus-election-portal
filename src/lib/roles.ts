@@ -3,13 +3,11 @@ export const facultyRoles = ["Coordinator"];
 
 export const clubAuthorities = [
     "President", 
-    "Vice-President", 
+    "Vice President", 
     "Technical Manager", 
     "Event Manager", 
     "Workshop Manager", 
-    "Project Manager", 
     "PR Manager", 
-    "Convo Manager", 
     "General Secretary"
 ];
 
@@ -17,8 +15,8 @@ export const clubOperationTeam = [
     "Technical Lead", 
     "Event Lead", 
     "Workshop Lead", 
-    "Project Lead", 
     "PR Lead", 
+    "General Lead",
     "Convo Lead", 
     "Assistant Secretary"
 ];
@@ -42,3 +40,5 @@ export const generalClubRoles = [
     "Member",
     "Other"
 ];
+
+    
