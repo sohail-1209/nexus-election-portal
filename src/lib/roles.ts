@@ -23,6 +23,15 @@ export const clubOperationTeam = [
     "Assistant Secretary"
 ];
 
+// All roles that can be selected in a voting room
+export const allElectionRoles = [
+    ...facultyRoles,
+    ...clubAuthorities,
+    ...clubOperationTeam,
+    "Other" // Keep other for custom roles
+];
+
+
 export const generalClubRoles = [
     "Public Relation Team",
     "Design and Content Creation Team", 

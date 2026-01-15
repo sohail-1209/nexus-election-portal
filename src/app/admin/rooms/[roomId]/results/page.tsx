@@ -9,7 +9,7 @@ import { getElectionRoomById, getVotersForRoom } from "@/lib/electionRoomService
 import type { ElectionRoom, Position, Candidate } from "@/lib/types";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users, Share2, ShieldAlert } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Trophy, Loader2, FileText, CheckCircle, Users, Share2, ShieldAlert, Pin } from "lucide-react";
 import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import ResultsTable from "@/components/app/admin/ResultsTable";
@@ -146,7 +146,7 @@ export default function ElectionResultsPage() {
     if (!room) return;
     setIsExporting(true);
 
-    const positionsToExport = room.positions;
+    const positionsToExport = room.finalized ? room.finalizedResults?.positions || [] : room.positions;
     const participants = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
 
     let mdContent = `# 📊 Results for: ${room.title}\n\n`;
@@ -178,10 +178,6 @@ export default function ElectionResultsPage() {
       positionsToExport.forEach(position => {
         const candidatesInPosition = position.candidates || [];
         const maxVotes = candidatesInPosition.length > 0 ? Math.max(...candidatesInPosition.map(c => c.voteCount || 0)) : 0;
-        
-        mdContent += `### ${position.title}\n\n`;
-        mdContent += `| Rank | Candidate | Votes | Percentage |\n`;
-        mdContent += `|:----:|:----------|:------|:-----------|\n`;
         
         const displayCandidates = [...candidatesInPosition].sort((a,b) => (b.voteCount || 0) - (a.voteCount || 0));
 
@@ -242,11 +238,12 @@ export default function ElectionResultsPage() {
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
   const canFinalize = room.status === 'closed' && !room.finalized;
+  const canPin = room.finalized && room.roomType === 'voting' && !room.pinnedToTerm;
 
   
   const renderResults = () => {
+    const positionsToDisplay = room.finalized ? room.finalizedResults?.positions || [] : room.positions;
     if (room.roomType === 'review') {
-        const positionsToDisplay = room.finalized ? room.finalizedResults?.positions || [] : room.positions;
         return (
             <div className="space-y-8">
                 <ReviewResultsDisplay room={room} positions={positionsToDisplay} />
@@ -265,7 +262,7 @@ export default function ElectionResultsPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent>
-                <ResultsTable positions={room.positions} totalCompletedVoters={participantsCount} room={room} />
+                <ResultsTable positions={positionsToDisplay} totalCompletedVoters={participantsCount} room={room} />
             </CardContent>
         </Card>
     );
@@ -311,8 +308,25 @@ export default function ElectionResultsPage() {
             {canFinalize && (
               <FinalizeRoomDialog roomId={room.id} onFinalized={fetchRoomData} />
             )}
+            {canPin && (
+              <Button asChild>
+                <Link href={`/admin/pin/${room.id}`}>
+                  <Pin className="mr-2 h-4 w-4" /> Pin Results to Home
+                </Link>
+              </Button>
+            )}
         </div>
       </div>
+
+      {room.pinnedToTerm && (
+         <Alert variant="default" className="border-blue-600/50 bg-blue-500/5">
+              <Pin className="h-4 w-4 text-blue-600" />
+              <AlertTitle>Results Pinned</AlertTitle>
+              <AlertDescription>
+              These election results have been published to the main dashboard.
+              </AlertDescription>
+          </Alert>
+      )}
 
       {room.finalized ? (
           <Alert variant="default" className="border-green-600/50 bg-green-500/5">

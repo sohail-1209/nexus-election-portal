@@ -4,13 +4,13 @@ export interface Candidate {
   imageUrl?: string;
   voteCount?: number; // Optional: for results
   positionTitle?: string; // Optional: for consolidated reports
-  id?: string; // This is now optional and will be removed from most logic
+  id?: string;
 }
 
 export interface Review {
   rating: number;
   feedback: string;
-  reviewerEmail?: string; // This will only exist on live data, not finalized data
+  reviewerEmail?: string; 
   reviewedAt: string;
 }
 
@@ -18,7 +18,6 @@ export interface Position {
   id: string;
   title: string;
   candidates: Candidate[];
-  // For review results
   averageRating?: number;
   reviews?: Review[];
   ratingDistribution?: { name: string, count: number }[];
@@ -34,16 +33,17 @@ export interface ElectionRoom {
   id:string;
   title: string;
   description: string;
-  isAccessRestricted: boolean; // Example property
-  accessCode?: string; // For joining the room
+  isAccessRestricted: boolean;
+  accessCode?: string;
   positions: Position[];
   createdAt: string;
-  updatedAt?: string; // Added for Firestore timestamp
+  updatedAt?: string;
   status: 'pending' | 'active' | 'closed' | 'archived';
   roomType?: 'voting' | 'review';
-  finalized?: boolean; // New flag to indicate if results are baked in
-  finalizedResults?: FinalizedResults; // Stored static results
+  finalized?: boolean;
+  finalizedResults?: FinalizedResults;
   groupId?: string | null;
+  pinnedToTerm?: boolean;
 }
 
 export interface Voter {
@@ -52,4 +52,22 @@ export interface Voter {
   lastActivity?: string;
   votedAt?: string;
   ownPositionTitle?: string;
+}
+
+// New Types for Leadership Dashboard
+export interface LeadershipRole {
+    id: string;
+    positionTitle: string;
+    holderName: string;
+    roleType: 'Authority' | 'Lead';
+}
+
+export interface Term {
+    id: string;
+    startDate: string;
+    endDate: string;
+    roles: LeadershipRole[];
+    createdAt: string;
+    sourceRoomId: string;
+    sourceRoomTitle: string;
 }

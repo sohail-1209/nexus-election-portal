@@ -26,7 +26,7 @@ import { useState, useEffect } from "react";
 import { db } from "@/lib/firebaseClient"; 
 import { doc, setDoc, addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { facultyRoles, clubAuthorities, clubOperationTeam, generalClubRoles } from "@/lib/roles";
+import { allElectionRoles } from "@/lib/roles";
 
 const candidateSchema = z.object({
   id: z.string().optional(), 
@@ -48,7 +48,7 @@ const reviewRoomFormSchema = z.object({
   status: z.enum(["pending", "active", "closed"]).optional(),
 }).refine(data => {
     const titles = data.positions.map(p => (p.title === 'Other' ? p.customTitle || '' : p.title).toLowerCase().trim());
-    const uniqueTitles = new Set(titles.filter(t => t)); // Filter out empty custom titles
+    const uniqueTitles = new Set(titles.filter(t => t)); 
     return uniqueTitles.size === titles.filter(t => t).length;
 }, {
     message: "Each position must be unique.",
@@ -79,8 +79,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isFormMounted, setIsFormMounted] = useState(false);
-  const allElectionRoles = [...facultyRoles, ...clubAuthorities, ...clubOperationTeam, ...generalClubRoles];
-
+  
   const form = useForm<ReviewRoomFormValues>({
     resolver: zodResolver(reviewRoomFormSchema),
     defaultValues: initialData ? {
@@ -321,7 +320,6 @@ interface PositionCardProps {
 
 function PositionCard({ positionIndex, removePosition, form, isOnlyPosition }: PositionCardProps) {
   const { control, watch } = form;
-  const allElectionRoles = [...facultyRoles, ...clubAuthorities, ...clubOperationTeam, ...generalClubRoles];
   const positionTitleValue = watch(`positions.${positionIndex}.title`);
 
   return (

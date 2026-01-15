@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -85,7 +84,7 @@ const VotingPositionCard = ({
               "w-full h-auto p-3 sm:p-4 justify-start text-left flex items-center gap-4 transition-all",
               isSelected && "border-primary ring-2 ring-primary bg-primary/5"
             )}
-            onClick={() => onVote(candidate.id)}
+            onClick={() => onVote(candidate.id!)}
           >
             <div className="flex-shrink-0">
               {isSelected ? (
@@ -527,7 +526,6 @@ export default function VotingPage() {
       }, {} as Record<string, any>);
 
       if (isCoordinator && Object.keys(validSelections).length === 0) {
-          // If a coordinator skipped all reviews, allow submission without error
           setSubmissionComplete(true);
           setIsSubmitting(false);
           return;

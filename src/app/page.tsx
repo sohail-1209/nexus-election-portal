@@ -1,83 +1,165 @@
 
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import Link from "next/link";
-import { ArrowRight, ShieldCheckIcon, Vote } from "lucide-react";
-import TypingAnimation from "@/components/app/TypingAnimation";
+import { useEffect, useState } from 'react';
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { db } from '@/lib/firebaseClient';
+import type { Term, LeadershipRole } from '@/lib/types';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Users, Crown, Shield, Star, Calendar, Clock } from 'lucide-react';
+import { format } from 'date-fns';
 
-export default function Home() {
-  const welcomeTexts = [
-    "Welcome to N.E.X.U.S Election Board",
-    "Secure & Transparent Admin Panel",
-    "Manage Your Elections & Reviews"
-  ];
+function LeadershipSkeleton() {
+    return (
+        <div className="space-y-8">
+            <div className="text-center">
+                <Skeleton className="h-10 w-3/4 mx-auto" />
+                <Skeleton className="h-4 w-1/2 mx-auto mt-3" />
+            </div>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/3" />
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                        <Card key={i}>
+                            <CardHeader>
+                                <Skeleton className="h-5 w-2/3" />
+                                <Skeleton className="h-6 w-1/2" />
+                            </CardHeader>
+                        </Card>
+                    ))}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/3" />
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                     {[...Array(4)].map((_, i) => (
+                        <Card key={i}>
+                            <CardHeader>
+                                <Skeleton className="h-5 w-2/3" />
+                                <Skeleton className="h-6 w-1/2" />
+                            </CardHeader>
+                        </Card>
+                    ))}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+function RoleCard({ role }: { role: LeadershipRole }) {
+    const icon = role.roleType === 'Authority' ? <Crown className="h-6 w-6 text-amber-500" /> : <Star className="h-6 w-6 text-blue-500" />;
+    
+    return (
+        <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <CardDescription>{role.positionTitle}</CardDescription>
+                    {icon}
+                </div>
+                <CardTitle className="text-2xl">{role.holderName || 'Position Vacant'}</CardTitle>
+            </CardHeader>
+        </Card>
+    )
+}
+
+export default function HomePage() {
+  const [term, setTerm] = useState<Term | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLatestTerm = async () => {
+      try {
+        const termsCollection = collection(db, 'terms');
+        const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
+        const termSnapshot = await getDocs(q);
+
+        if (!termSnapshot.empty) {
+          const termDoc = termSnapshot.docs[0];
+          setTerm({ id: termDoc.id, ...termDoc.data() } as Term);
+        }
+      } catch (error) {
+        console.error("Error fetching latest term:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLatestTerm();
+  }, []);
+
+  if (loading) {
+    return (
+        <div className="container mx-auto py-8 px-4">
+            <LeadershipSkeleton />
+        </div>
+    );
+  }
+
+  if (!term) {
+    return (
+      <div className="container mx-auto py-8 px-4 text-center">
+        <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+                <Users className="h-16 w-16 mx-auto text-muted-foreground" />
+                <CardTitle className="mt-4">No Leadership Term Published</CardTitle>
+                <CardDescription className="mt-2">
+                    There is currently no active leadership term published on the dashboard. Please complete an election and use the "Pin Results to Home" feature to publish the new leadership structure.
+                </CardDescription>
+            </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  const authorities = term.roles.filter(r => r.roleType === 'Authority');
+  const leads = term.roles.filter(r => r.roleType === 'Lead');
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-200px)] py-12">
-      <div className="text-center mb-16 px-2">
-        <div className="h-24 md:h-16 mb-6">
-            <h1 className="text-3xl md:text-5xl font-bold font-headline mb-4 animate-fade-in-up">
-            <TypingAnimation texts={welcomeTexts} />
-            </h1>
-        </div>
-        <p className="text-base md:text-xl text-muted-foreground max-w-3xl mx-auto">
-          Securely manage elections and gather feedback with ease. Our platform ensures transparency and integrity for all your administrative needs.
-        </p>
-      </div>
+    <div className="container mx-auto py-8 px-4 space-y-10">
+        <header className="text-center">
+            <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
+            <p className="text-muted-foreground mt-2 text-lg">
+                Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
+            </p>
+            <div className="flex justify-center items-center gap-6 mt-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>Source Election: {term.sourceRoomTitle}</span>
+                </div>
+            </div>
+        </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-4xl">
-        {/* Admin Panel Card */}
-        <Card className="hover:shadow-xl transition-shadow duration-300 flex flex-col">
-           <CardHeader>
-            <CardTitle className="flex items-center text-xl md:text-2xl font-headline">
-                <ShieldCheckIcon className="mr-3 h-7 w-7 text-primary" />
-                Admin Panel
-            </CardTitle>
-            <CardDescription>
-              Administrators create and manage voting rooms from the panel.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex-grow">
-             <p className="text-sm md:text-base">
-              Login to access the administrator tools for creating, managing, and viewing results for all rooms.
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Button asChild className="w-full">
-                <Link href="/admin/login">
-                    Admin Login <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-        
-        {/* Voter Access Card */}
-        <Card className="hover:shadow-xl transition-shadow duration-300 flex flex-col">
-           <CardHeader>
-            <CardTitle className="flex items-center text-xl md:text-2xl font-headline">
-                <Vote className="mr-3 h-7 w-7 text-primary" />
-                Participant Access
-            </CardTitle>
-            <CardDescription>
-              Cast your vote or submit your review here.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex-grow">
-             <p className="text-sm md:text-base">
-              If you have a Room ID, you can access the voting or review page to make your submission.
-            </p>
-          </CardContent>
-          <CardFooter>
-            <Button asChild className="w-full">
-                <Link href="/vote">
-                    Enter a Room <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
+        {authorities.length > 0 && (
+            <section>
+                <div className="flex items-center gap-3 mb-4">
+                    <Shield className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Authorities</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {authorities.map(role => <RoleCard key={role.id} role={role} />)}
+                </div>
+            </section>
+        )}
+
+        {leads.length > 0 && (
+            <section>
+                 <div className="flex items-center gap-3 mb-4">
+                    <Star className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Leads</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {leads.map(role => <RoleCard key={role.id} role={role} />)}
+                </div>
+            </section>
+        )}
     </div>
   );
 }

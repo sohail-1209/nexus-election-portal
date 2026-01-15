@@ -28,7 +28,7 @@ import { storage, db } from "@/lib/firebaseClient";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { doc, setDoc, addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore"; 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { facultyRoles, clubAuthorities, clubOperationTeam, generalClubRoles } from "@/lib/roles";
+import { allElectionRoles } from "@/lib/roles";
 
 
 const candidateSchema = z.object({
@@ -52,7 +52,7 @@ const electionRoomFormSchema = z.object({
   status: z.enum(["pending", "active", "closed"]).optional(),
 }).refine(data => {
     const titles = data.positions.map(p => (p.title === 'Other' ? p.customTitle || '' : p.title).toLowerCase().trim());
-    const uniqueTitles = new Set(titles.filter(t => t)); // Filter out empty custom titles
+    const uniqueTitles = new Set(titles.filter(t => t)); 
     return uniqueTitles.size === titles.filter(t => t).length;
 }, {
     message: "Each position must be unique.",
@@ -84,7 +84,6 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isFormMounted, setIsFormMounted] = useState(false);
-  const allElectionRoles = [...facultyRoles, ...clubAuthorities, ...clubOperationTeam, ...generalClubRoles];
 
   const form = useForm<ElectionRoomFormValues>({
     resolver: zodResolver(electionRoomFormSchema),
@@ -151,8 +150,8 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
     const dataToSave: any = { 
       title: values.title,
       description: values.description,
-      isAccessRestricted: false, // Explicitly set to false
-      accessCode: null, // Explicitly set to null
+      isAccessRestricted: false,
+      accessCode: null,
       positions: firestoreReadyPositions,
       roomType: initialData?.roomType || 'voting',
       status: values.status || 'pending',
@@ -254,7 +253,6 @@ export default function ElectionRoomForm({ initialData }: ElectionRoomFormProps)
                   <Switch
                     checked={field.value === 'active'}
                     onCheckedChange={(checked) => {
-                      // Keep 'pending' if it was pending, otherwise toggle between active/closed
                       const currentStatus = form.getValues('status');
                       let newStatus: 'pending' | 'active' | 'closed';
                       if(currentStatus === 'pending' && !checked) {
@@ -335,7 +333,6 @@ interface PositionCardProps {
 
 function PositionCard({ positionIndex, removePosition, form, initialData, isOnlyPosition }: PositionCardProps) {
   const { control, watch } = form;
-  const allElectionRoles = [...facultyRoles, ...clubAuthorities, ...clubOperationTeam, ...generalClubRoles];
   const positionTitleValue = watch(`positions.${positionIndex}.title`);
 
   return (
