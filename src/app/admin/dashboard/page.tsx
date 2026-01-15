@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function DashboardSkeleton() {
   return (
@@ -123,6 +124,39 @@ function RoomCard({ room, onRoomDeleted }: { room: ElectionRoom; onRoomDeleted: 
     );
 }
 
+function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], roomType: 'voting' | 'review', onRoomDeleted: () => void }) {
+    const isVoting = roomType === 'voting';
+    
+    return (
+        <div className="flex flex-col min-h-0 rounded-lg p-4 space-y-4">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-xl font-bold font-headline">{isVoting ? "Voting Rooms" : "Review & Rating Rooms"}</h2>
+                    <p className="text-sm text-muted-foreground">{isVoting ? "Create and manage standard elections." : "Gather feedback and ratings."}</p>
+                </div>
+                <Button asChild size="sm" variant={isVoting ? "default" : "secondary"}>
+                  <Link href={isVoting ? "/admin/rooms/create" : "/admin/rooms/create-review"}>
+                      <PlusCircle /> Create New
+                  </Link>
+                </Button>
+            </div>
+            <ScrollArea className="flex-grow pr-4 -mr-4">
+              {rooms.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {rooms.map(room => (
+                        <RoomCard key={room.id} room={room} onRoomDeleted={onRoomDeleted} />
+                    ))}
+                </div>
+              ) : (
+                 <div className="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg">
+                    No {isVoting ? 'voting' : 'review'} rooms found.
+                </div>
+              )}
+            </ScrollArea>
+        </div>
+    );
+}
+
 export default function AdminDashboardPage() {
   const [electionRooms, setElectionRooms] = useState<ElectionRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -187,60 +221,21 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)]">
-      <div className="flex-grow grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-0">
-          {/* Voting Rooms Column */}
-          <div className="flex flex-col min-h-0 rounded-lg border-primary/30 border bg-card/50 p-4 space-y-4">
-              <div className="flex justify-between items-center">
-                  <div>
-                      <h2 className="text-lg font-semibold">Voting Rooms</h2>
-                      <p className="text-sm text-muted-foreground">Create and manage standard elections.</p>
-                  </div>
-                  <Button asChild size="sm">
-                    <Link href="/admin/rooms/create">
-                        <PlusCircle /> Create New
-                    </Link>
-                  </Button>
-              </div>
-              <ScrollArea className="flex-grow -mx-4 px-4">
-                {votingRooms.length > 0 ? (
-                  <div className="grid grid-cols-1 gap-6 pr-1">
-                      {votingRooms.map(room => (
-                          <RoomCard key={room.id} room={room} onRoomDeleted={fetchData} />
-                      ))}
-                  </div>
-                ) : (
-                   <div className="text-center text-muted-foreground py-10">No voting rooms found.</div>
-                )}
-              </ScrollArea>
-          </div>
-          
-           {/* Review Rooms Column */}
-          <div className="flex flex-col min-h-0 rounded-lg border-purple-500/50 border bg-card/50 p-4 space-y-4">
-               <div className="flex justify-between items-center">
-                   <div>
-                       <h2 className="text-lg font-semibold">Review & Rating Rooms</h2>
-                       <p className="text-sm text-muted-foreground">Gather feedback and ratings.</p>
-                   </div>
-                  <Button asChild variant="secondary" size="sm">
-                    <Link href="/admin/rooms/create-review">
-                        <PlusCircle /> Create New
-                    </Link>
-                  </Button>
-              </div>
-              <ScrollArea className="flex-grow -mx-4 px-4">
-                  {reviewRooms.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-6 pr-1">
-                        {reviewRooms.map(room => (
-                            <RoomCard key={room.id} room={room} onRoomDeleted={fetchData} />
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center text-muted-foreground py-10">No review rooms found.</div>
-                  )}
-              </ScrollArea>
-          </div>
-        </div>
-    </div>
+      <Tabs defaultValue="voting" orientation="vertical" className="flex h-[calc(100vh-140px)] gap-8">
+        <TabsList className="flex flex-col h-full justify-start items-stretch bg-card p-2 w-48">
+            <TabsTrigger value="voting" className="justify-start gap-2">
+                <Vote /> Voting Rooms
+            </TabsTrigger>
+            <TabsTrigger value="review" className="justify-start gap-2">
+                <Star /> Review Rooms
+            </TabsTrigger>
+        </TabsList>
+        <TabsContent value="voting" className="flex-1 min-w-0">
+            <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
+        </TabsContent>
+        <TabsContent value="review" className="flex-1 min-w-0">
+            <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
+        </TabsContent>
+      </Tabs>
   );
 }
