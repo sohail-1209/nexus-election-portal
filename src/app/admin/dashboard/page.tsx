@@ -8,6 +8,7 @@ import { auth, db } from "@/lib/firebaseClient";
 import { getElectionRoomsAndGroups } from "@/lib/electionRoomService";
 import type { ElectionRoom, Term, LeadershipRole } from "@/lib/types";
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { clubAuthorities, clubOperationTeam } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -33,7 +34,7 @@ function LeadershipSkeleton() {
                 <CardHeader>
                     <Skeleton className="h-8 w-1/3" />
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                     {[...Array(6)].map((_, i) => (
                         <Card key={i}>
                             <CardHeader>
@@ -48,7 +49,7 @@ function LeadershipSkeleton() {
                 <CardHeader>
                     <Skeleton className="h-8 w-1/3" />
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                      {[...Array(4)].map((_, i) => (
                         <Card key={i}>
                             <CardHeader>
@@ -63,17 +64,17 @@ function LeadershipSkeleton() {
     );
 }
 
-function RoleCard({ role }: { role: LeadershipRole }) {
-    const icon = role.roleType === 'Authority' ? <Crown className="h-6 w-6 text-amber-500" /> : <Star className="h-6 w-6 text-blue-500" />;
+function RoleCard({ title, holder, type }: { title: string, holder?: string, type: 'Authority' | 'Lead' }) {
+    const icon = type === 'Authority' ? <Crown className="h-6 w-6 text-amber-500" /> : <Star className="h-6 w-6 text-blue-500" />;
     
     return (
         <Card className="hover:shadow-lg transition-shadow">
             <CardHeader>
                 <div className="flex items-center justify-between">
-                    <CardDescription>{role.positionTitle}</CardDescription>
+                    <CardDescription>{title}</CardDescription>
                     {icon}
                 </div>
-                <CardTitle className="text-2xl">{role.holderName || 'Position Vacant'}</CardTitle>
+                <CardTitle className="text-2xl">{holder || 'Position Vacant'}</CardTitle>
             </CardHeader>
         </Card>
     )
@@ -103,6 +104,26 @@ function LeadershipView() {
     fetchLatestTerm();
   }, []);
 
+  const leadershipRoles = useMemo(() => {
+      const pinnedRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));
+      
+      const authorities = clubAuthorities.map(title => ({
+          title,
+          holderName: pinnedRoles.get(title),
+          roleType: 'Authority' as const
+      }));
+
+      const leads = clubOperationTeam.map(title => ({
+          title,
+          holderName: pinnedRoles.get(title),
+          roleType: 'Lead' as const
+      }));
+
+      return { authorities, leads };
+
+  }, [term]);
+
+
   if (loading) {
     return <LeadershipSkeleton />;
   }
@@ -123,11 +144,8 @@ function LeadershipView() {
     );
   }
 
-  const authorities = term.roles.filter(r => r.roleType === 'Authority');
-  const leads = term.roles.filter(r => r.roleType === 'Lead');
-
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 p-6">
         <header className="text-center">
             <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
             <p className="text-muted-foreground mt-2 text-lg">
@@ -145,29 +163,27 @@ function LeadershipView() {
             </div>
         </header>
 
-        {authorities.length > 0 && (
-            <section>
-                <div className="flex items-center gap-3 mb-4">
-                    <Shield className="h-7 w-7 text-primary" />
-                    <h2 className="text-3xl font-semibold">Authorities</h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {authorities.map(role => <RoleCard key={role.id} role={role} />)}
-                </div>
-            </section>
-        )}
+        
+        <section>
+            <div className="flex items-center gap-3 mb-4">
+                <Shield className="h-7 w-7 text-primary" />
+                <h2 className="text-3xl font-semibold">Authorities</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {leadershipRoles.authorities.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
+            </div>
+        </section>
 
-        {leads.length > 0 && (
-            <section>
-                 <div className="flex items-center gap-3 mb-4">
-                    <Star className="h-7 w-7 text-primary" />
-                    <h2 className="text-3xl font-semibold">Leads</h2>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {leads.map(role => <RoleCard key={role.id} role={role} />)}
-                </div>
-            </section>
-        )}
+        <section>
+             <div className="flex items-center gap-3 mb-4">
+                <Star className="h-7 w-7 text-primary" />
+                <h2 className="text-3xl font-semibold">Leads</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {leadershipRoles.leads.map(role => <RoleCard key={role.title} title={role.title} holder={role.holderName} type={role.roleType} />)}
+            </div>
+        </section>
+        
     </div>
   );
 }
@@ -175,29 +191,27 @@ function LeadershipView() {
 
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8 p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {[1, 2].map(i => (
-          <Card key={i} className="h-[70vh]">
-            <CardHeader className="flex flex-row justify-between items-center">
-              <Skeleton className="h-5 w-24" />
-              <Skeleton className="h-9 w-32" />
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <Card>
-                <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
-                <CardContent><Skeleton className="h-4 w-full" /></CardContent>
-                <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
-              </Card>
-               <Card>
-                <CardHeader><Skeleton className="h-6 w-3/4" /></CardHeader>
-                <CardContent><Skeleton className="h-4 w-full" /></CardContent>
-                <CardFooter><Skeleton className="h-10 w-full" /></CardFooter>
-              </Card>
-            </CardContent>
-          </Card>
-        ))}
+    <div className="flex h-screen bg-background">
+      <div className="w-64 flex-shrink-0 bg-muted/40 p-4 flex flex-col gap-2 border-r">
+          <div className="font-bold text-lg p-4 mb-2"><Skeleton className="h-6 w-3/4" /></div>
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
       </div>
+      <main className="flex-1 p-6 overflow-auto">
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader>
+                  <CardContent><Skeleton className="h-40 w-full" /></CardContent>
+                </Card>
+                 <Card>
+                  <CardHeader><Skeleton className="h-8 w-1/3" /></CardHeader>
+                  <CardContent><Skeleton className="h-40 w-full" /></CardContent>
+                </Card>
+            </div>
+          </div>
+      </main>
     </div>
   );
 }
@@ -281,7 +295,7 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
     const isVoting = roomType === 'voting';
     
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full p-6">
             <div className="flex-shrink-0 flex justify-between items-center pb-4">
                 <div>
                     <h2 className="text-xl font-bold">{isVoting ? "Voting Rooms" : "Review & Rating Rooms"}</h2>
@@ -421,13 +435,9 @@ export default function AdminDashboardPage() {
                 <span>Review Rooms</span>
             </button>
         </nav>
-        <main className="flex-1 p-6 overflow-auto">
-            <div className="h-full">
-                {renderActiveView()}
-            </div>
+        <main className="flex-1 overflow-auto">
+            {renderActiveView()}
         </main>
     </div>
   );
 }
-
-    
