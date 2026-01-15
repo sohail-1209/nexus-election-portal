@@ -420,9 +420,9 @@ export default function PinToHomePage() {
                 <Button
                     type="button"
                     onClick={handlePasswordConfirmation}
-                    disabled={isLoading || password.length < 6}
+                    disabled={isSubmitting || password.length < 6}
                 >
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Confirm
                 </Button>
             </DialogFooter>
