@@ -203,7 +203,7 @@ export default function ManageElectionRoomPage() {
 
   if (loading) {
      return (
-        <div className="max-w-6xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto space-y-6 p-4 md:p-6">
             <Skeleton className="h-10 w-48" /> 
             <Card>
                 <CardHeader>
@@ -220,20 +220,22 @@ export default function ManageElectionRoomPage() {
   
   if (error) {
     return (
-      <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
-            <AlertTriangle className="h-10 w-10" />
-          </div>
-          <CardTitle className="text-2xl">Error Loading Page</CardTitle>
-          <CardDescription>{error}</CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <Button onClick={() => router.push('/admin/login')}>
-            Go to Login Page
-          </Button>
-        </CardContent>
-      </Card>
+     <div className="max-w-6xl mx-auto p-4 md:p-6">
+        <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
+            <CardHeader className="text-center">
+            <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
+                <AlertTriangle className="h-10 w-10" />
+            </div>
+            <CardTitle className="text-2xl">Error Loading Page</CardTitle>
+            <CardDescription>{error}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+            <Button onClick={() => router.push('/admin/login')}>
+                Go to Login Page
+            </Button>
+            </CardContent>
+        </Card>
+     </div>
     )
   }
 
@@ -251,13 +253,15 @@ export default function ManageElectionRoomPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex justify-between items-center flex-wrap gap-2">
-        <Button variant="outline" asChild>
-          <Link href="/admin/dashboard">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-          </Link>
-        </Button>
+    <div className="max-w-6xl mx-auto space-y-8 p-4 md:p-6">
+      <div className="flex justify-between items-center flex-wrap gap-4">
+        <div>
+            <Button variant="outline" asChild>
+            <Link href="/admin/dashboard">
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+            </Link>
+            </Button>
+        </div>
         <div className="flex items-center gap-2">
             <Dialog>
                 <DialogTrigger asChild>
@@ -328,3 +332,5 @@ export default function ManageElectionRoomPage() {
     </div>
   );
 }
+
+    
