@@ -202,7 +202,7 @@ export async function recordParticipantEntry(
     ownPositionTitle: string
 ): Promise<{ success: boolean; message: string }> {
     const clubAuthorities = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
-    const clubOperationTeam = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "General Lead", "Assistant Secretary"];
+    const clubOperationTeam = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "Assistant Secretary"];
     
     const isRestrictedRole = clubAuthorities.includes(ownPositionTitle) || clubOperationTeam.includes(ownPositionTitle);
 
@@ -588,4 +588,31 @@ export async function clearLatestTerm(adminPassword: string): Promise<{ success:
     }
 }
 
+export async function updateTermRoles(updatedRoles: LeadershipRole[]): Promise<{ success: boolean; message: string }> {
+    try {
+        const latestTerm = await getLatestTerm();
+
+        if (latestTerm) {
+            // If a term exists, update its roles
+            const termRef = doc(db, 'terms', latestTerm.id);
+            await updateDoc(termRef, { roles: updatedRoles });
+            return { success: true, message: 'Leadership structure has been updated.' };
+        } else {
+            // If no term exists, create a new one
+            const newTermData = {
+                startDate: new Date().toISOString(),
+                endDate: new Date(new Date().setMonth(new Date().getMonth() + 6)).toISOString(),
+                roles: updatedRoles,
+                createdAt: serverTimestamp(),
+                sourceRoomId: 'manual_update',
+                sourceRoomTitle: 'Manual Admin Edit',
+            };
+            await addDoc(collection(db, 'terms'), newTermData);
+            return { success: true, message: 'New leadership term has been created and updated.' };
+        }
+    } catch (error) {
+        console.error("Error updating term roles:", error);
+        return { success: false, message: 'An unexpected error occurred while updating the leadership structure.' };
+    }
+}
     

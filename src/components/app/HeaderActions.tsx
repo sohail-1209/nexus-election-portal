@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2, PinOff, Share2 } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2, PinOff, Share2, Edit } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -32,6 +32,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import ShareableLinkDisplay from "./admin/ShareableLinkDisplay";
+import EditTermDialog from "./admin/EditTermDialog";
 
 
 export default function HeaderActions() {
@@ -175,6 +176,16 @@ export default function HeaderActions() {
                      </div>
                   </DropdownMenuItem>
               </MultiPinDialog>
+               <EditTermDialog onTermUpdated={handleTermCleared}>
+                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                       <div className="flex w-full items-center justify-between">
+                           <span className="flex items-center gap-2">
+                             <Edit className="h-4 w-4" />
+                             Edit Leadership
+                           </span>
+                       </div>
+                    </DropdownMenuItem>
+                </EditTermDialog>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>Destructive Actions</DropdownMenuLabel>
                 <EnableDeletionDialog>
