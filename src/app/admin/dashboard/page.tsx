@@ -132,7 +132,7 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
         <div className="flex flex-col h-full">
             <div className="flex-shrink-0 flex justify-between items-center pb-4">
                 <div>
-                    <h2 className="text-xl font-bold font-headline">{isVoting ? "Voting Rooms" : "Review & Rating Rooms"}</h2>
+                    <h2 className="text-xl font-bold">{isVoting ? "Voting Rooms" : "Review & Rating Rooms"}</h2>
                     <p className="text-sm text-muted-foreground">{isVoting ? "Create and manage standard elections." : "Gather feedback and ratings."}</p>
                 </div>
                 <Button asChild size="sm" variant={isVoting ? "default" : "secondary"}>
@@ -226,34 +226,34 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-4.1rem)]">
+    <div className="h-screen flex">
         <Tabs defaultValue="voting" orientation="vertical" className="flex h-full gap-4">
             <TabsList className={cn(
                 "flex flex-col h-full justify-start items-stretch p-2 w-52 bg-muted rounded-none"
             )}>
-                 <Button variant="ghost" asChild className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-foreground hover:bg-accent hover:text-accent-foreground">
+                 <Button variant="ghost" asChild className="justify-start gap-2 text-base py-3 px-4 text-foreground/80 hover:bg-accent hover:text-accent-foreground font-normal">
                     <Link href="/">
                         <Home /> Home
                     </Link>
                 </Button>
-                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 text-foreground/80 hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg font-normal">
                     <Vote /> Voting Rooms
                 </TabsTrigger>
-                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 text-foreground/80 hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg font-normal">
                     <Star /> Review Rooms
                 </TabsTrigger>
             </TabsList>
-            <div className="flex-1 p-6 min-w-0">
-                <TabsContent value="voting" className="m-0 h-full">
-                    <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
-                </TabsContent>
-                <TabsContent value="review" className="m-0 h-full">
-                    <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
-                </TabsContent>
+            <div className="flex-1 p-6 min-w-0 overflow-hidden">
+                <div className="h-full">
+                    <TabsContent value="voting" className="m-0 h-full">
+                        <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
+                    </TabsContent>
+                    <TabsContent value="review" className="m-0 h-full">
+                        <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
+                    </TabsContent>
+                </div>
             </div>
         </Tabs>
       </div>
   );
 }
-
-    
