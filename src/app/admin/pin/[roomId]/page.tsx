@@ -6,7 +6,7 @@ import { useParams, useRouter, notFound } from "next/navigation";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
 import { getElectionRoomById, pinResultsToHome, getLatestTerm } from "@/lib/electionRoomService";
 import type { ElectionRoom, LeadershipRole, Term } from "@/lib/types";
@@ -20,12 +20,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { ArrowLeft, CalendarIcon, Loader2, Pin, AlertTriangle, ShieldAlert } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { ArrowLeft, CalendarIcon, Loader2, Pin, AlertTriangle, ShieldAlert, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { format, add } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 
 
 const leadershipRoleSchema = z.object({
@@ -80,7 +82,12 @@ export default function PinToHomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [showTermAlert, setShowTermAlert] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPasswordState] = useState(false);
+
   const [formValues, setFormValues] = useState<PinFormValues | null>(null);
   
   const form = useForm<PinFormValues>({
@@ -104,11 +111,8 @@ export default function PinToHomePage() {
             notFound();
             return;
           }
-          if (!roomData.finalized || roomData.pinnedToTerm) {
-             setError(roomData.pinnedToTerm 
-                ? "This room's results have already been pinned to the dashboard."
-                : "This room's results must be finalized before they can be pinned."
-             );
+          if (!roomData.finalized) {
+             setError("This room's results must be finalized before they can be pinned.");
              setRoom(roomData);
              setLoading(false);
              return;
@@ -176,25 +180,55 @@ export default function PinToHomePage() {
     setIsSubmitting(false);
   }
 
-  const onSubmit = async (values: PinFormValues) => {
+  const onSubmit = (values: PinFormValues) => {
     setFormValues(values);
-
-    const latestTerm = await getLatestTerm();
-    
-    if (latestTerm) {
-        const formStart = values.startDate.setHours(0,0,0,0);
-        const formEnd = values.endDate.setHours(0,0,0,0);
-        const termStart = new Date(latestTerm.startDate).setHours(0,0,0,0);
-        const termEnd = new Date(latestTerm.endDate).setHours(0,0,0,0);
-
-        if (formStart !== termStart || formEnd !== termEnd) {
-            setShowTermAlert(true);
-            return;
-        }
+    setShowPasswordDialog(true);
+  };
+  
+  const handlePasswordConfirmation = async () => {
+    const user = auth.currentUser;
+    if (!user || !user.email || !formValues) {
+        toast({ variant: "destructive", title: "Authentication Error", description: "You are not logged in." });
+        return;
     }
     
-    await handleFinalSubmission(false); // Same dates or no existing term, so merge.
-  }
+    setIsSubmitting(true);
+    const credential = EmailAuthProvider.credential(user.email, password);
+    
+    try {
+        await reauthenticateWithCredential(user, credential);
+        
+        setShowPasswordDialog(false);
+        setPassword('');
+        
+        const latestTerm = await getLatestTerm();
+        if (latestTerm) {
+            const formStart = formValues.startDate.setHours(0,0,0,0);
+            const formEnd = formValues.endDate.setHours(0,0,0,0);
+            const termStart = new Date(latestTerm.startDate).setHours(0,0,0,0);
+            const termEnd = new Date(latestTerm.endDate).setHours(0,0,0,0);
+
+            if (formStart !== termStart || formEnd !== termEnd) {
+                setShowTermAlert(true);
+                setIsSubmitting(false);
+                return;
+            }
+        }
+        await handleFinalSubmission(false); // Same dates or no existing term, so merge.
+
+    } catch (error) {
+        toast({
+            variant: "destructive",
+            title: "Password Incorrect",
+            description: "The password you entered is incorrect. Please try again.",
+        });
+    } finally {
+        if (!showTermAlert) { // Do not set loading to false if we are showing another dialog
+             setIsSubmitting(false);
+        }
+    }
+  };
+
 
   if (loading) {
     return <PinToHomeSkeleton />;
@@ -344,6 +378,56 @@ export default function PinToHomePage() {
           </Card>
         </form>
       </Form>
+
+       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+                <DialogTitle>Confirm Your Identity</DialogTitle>
+                <DialogDescription>
+                To perform this sensitive action, please enter your password.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                    <Label htmlFor="admin-password-pin">
+                        Enter your password to confirm
+                    </Label>
+                    <div className="relative">
+                        <Input
+                            id="admin-password-pin"
+                            type={showPassword ? "text" : "password"}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="••••••••"
+                            autoFocus
+                        />
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowPasswordState((prev) => !prev)}
+                        >
+                            {showPassword ? <EyeOff className="h-5 w-5 text-muted-foreground" /> : <Eye className="h-5 w-5 text-muted-foreground" />}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+            <DialogFooter className="sm:justify-end gap-2">
+                <DialogClose asChild>
+                    <Button type="button" variant="secondary">Cancel</Button>
+                </DialogClose>
+                <Button
+                    type="button"
+                    onClick={handlePasswordConfirmation}
+                    disabled={isLoading || password.length < 6}
+                >
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
        <AlertDialog open={showTermAlert} onOpenChange={setShowTermAlert}>
         <AlertDialogContent>

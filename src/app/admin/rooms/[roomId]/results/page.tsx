@@ -238,7 +238,7 @@ export default function ElectionResultsPage() {
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
   const canFinalize = room.status === 'closed' && !room.finalized;
-  const canPin = room.finalized && room.roomType === 'voting' && !room.pinnedToTerm;
+  const canPin = room.finalized && room.roomType === 'voting';
 
   
   const renderResults = () => {
@@ -323,7 +323,7 @@ export default function ElectionResultsPage() {
               <Pin className="h-4 w-4 text-blue-600" />
               <AlertTitle>Results Pinned</AlertTitle>
               <AlertDescription>
-              These election results have been published to the main dashboard.
+              These election results have been published to the main dashboard. You can re-pin them to merge or create a new term.
               </AlertDescription>
           </Alert>
       )}
