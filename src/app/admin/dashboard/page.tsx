@@ -7,7 +7,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseClient";
 import { getElectionRoomsAndGroups } from "@/lib/electionRoomService";
 import type { ElectionRoom, Term, LeadershipRole } from "@/lib/types";
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
+import { collection, getDocs, limit, orderBy, query, onSnapshot } from 'firebase/firestore';
 import { clubAuthorities, clubOperationTeam } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
+import ClearTermDialog from "@/components/app/admin/ClearTermDialog";
 
 
 function LeadershipSkeleton() {
@@ -68,41 +69,52 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
     const icon = type === 'Authority' ? <Crown className="h-6 w-6 text-amber-500" /> : <Star className="h-6 w-6 text-blue-500" />;
     
     return (
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow bg-card/50">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardDescription>{title}</CardDescription>
                     {icon}
                 </div>
-                <CardTitle className="text-2xl">{holder || 'Position Vacant'}</CardTitle>
+                <CardTitle className="text-2xl pt-2">{holder || 'Position Vacant'}</CardTitle>
             </CardHeader>
         </Card>
     )
 }
 
-function LeadershipView() {
+function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
   const [term, setTerm] = useState<Term | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchLatestTerm = async () => {
-      try {
-        const termsCollection = collection(db, 'terms');
-        const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
-        const termSnapshot = await getDocs(q);
-
+  const fetchLatestTerm = useCallback(async () => {
+    setLoading(true);
+    try {
+      const termsCollection = collection(db, 'terms');
+      const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
+      const unsubscribe = onSnapshot(q, (termSnapshot) => {
         if (!termSnapshot.empty) {
           const termDoc = termSnapshot.docs[0];
           setTerm({ id: termDoc.id, ...termDoc.data() } as Term);
+        } else {
+          setTerm(null);
         }
-      } catch (error) {
-        console.error("Error fetching latest term:", error);
-      } finally {
         setLoading(false);
-      }
-    };
-    fetchLatestTerm();
+      });
+      return unsubscribe;
+    } catch (error) {
+      console.error("Error fetching latest term:", error);
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+    fetchLatestTerm().then(unsub => { unsubscribe = unsub });
+    return () => {
+        if(unsubscribe) {
+            unsubscribe();
+        }
+    };
+  }, [fetchLatestTerm]);
 
   const leadershipRoles = useMemo(() => {
       const pinnedRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));
@@ -130,7 +142,7 @@ function LeadershipView() {
 
   if (!term) {
     return (
-      <div className="text-center">
+      <div className="text-center p-6">
         <Card className="max-w-2xl mx-auto">
             <CardHeader>
                 <Users className="h-16 w-16 mx-auto text-muted-foreground" />
@@ -147,18 +159,17 @@ function LeadershipView() {
   return (
     <div className="space-y-10 p-6">
         <header className="text-center">
+            <div className="flex justify-center mb-4">
+                 <ClearTermDialog onTermCleared={onTermCleared} />
+            </div>
             <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
             <p className="text-muted-foreground mt-2 text-lg">
                 Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
             </p>
-            <div className="flex justify-center items-center gap-6 mt-4 text-sm text-muted-foreground">
+             <div className="flex justify-center items-center gap-6 mt-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>Source Election: {term.sourceRoomTitle}</span>
                 </div>
             </div>
         </header>
@@ -332,6 +343,7 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<'home' | 'voting' | 'review'>('home');
+  const [termCleared, setTermCleared] = useState(0);
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
@@ -340,7 +352,6 @@ export default function AdminDashboardPage() {
       const { rooms } = await getElectionRoomsAndGroups();
       setElectionRooms(rooms);
     } catch (err: any) {
-      console.error("Failed to fetch data:", err);
       if (err.code === 'permission-denied') {
         setError("You do not have permission to view the dashboard. Please contact support.");
       } else {
@@ -367,6 +378,11 @@ export default function AdminDashboardPage() {
     const reviewRooms = electionRooms.filter(room => room.roomType === 'review' && room.status !== 'archived');
     return { votingRooms, reviewRooms };
   }, [electionRooms]);
+
+  const handleTermCleared = () => {
+      setTermCleared(c => c + 1); 
+  };
+
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -399,13 +415,13 @@ export default function AdminDashboardPage() {
   const renderActiveView = () => {
     switch (activeView) {
         case 'home':
-            return <LeadershipView />;
+            return <LeadershipView key={termCleared} onTermCleared={handleTermCleared} />;
         case 'voting':
             return <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />;
         case 'review':
             return <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />;
         default:
-            return <LeadershipView />;
+            return <LeadershipView key={termCleared} onTermCleared={handleTermCleared} />;
     }
   };
 
@@ -441,3 +457,5 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
+    

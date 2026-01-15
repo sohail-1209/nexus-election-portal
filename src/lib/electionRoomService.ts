@@ -201,8 +201,8 @@ export async function recordParticipantEntry(
     voterEmail: string,
     ownPositionTitle: string
 ): Promise<{ success: boolean; message: string }> {
-    const clubAuthorities = ["President", "Vice-President", "Technical Manager", "Event Manager", "Workshop Manager", "Project Manager", "PR Manager", "Convo Manager", "General Secretary"];
-    const clubOperationTeam = ["Technical Lead", "Event Lead", "Workshop Lead", "Project Lead", "PR Lead", "Convo Lead", "Assistant Secretary"];
+    const clubAuthorities = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
+    const clubOperationTeam = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "General Lead", "Assistant Secretary"];
     
     const isRestrictedRole = clubAuthorities.includes(ownPositionTitle) || clubOperationTeam.includes(ownPositionTitle);
 
@@ -560,3 +560,32 @@ export async function getLatestTerm(): Promise<Term | null> {
         return null;
     }
 }
+
+export async function clearLatestTerm(adminPassword: string): Promise<{ success: boolean; message: string }> {
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+        return { success: false, message: "Authentication required. Please log in again." };
+    }
+    try {
+        const credential = EmailAuthProvider.credential(user.email, adminPassword);
+        await reauthenticateWithCredential(user, credential);
+
+        const latestTerm = await getLatestTerm();
+        if (!latestTerm) {
+            return { success: true, message: "There is no active term to clear." };
+        }
+        
+        await deleteDoc(doc(db, 'terms', latestTerm.id));
+        
+        return { success: true, message: "The latest term has been cleared." };
+
+    } catch (error: any) {
+        console.error("Error clearing term:", error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+            return { success: false, message: "Incorrect password. Action failed." };
+        }
+        return { success: false, message: "An unexpected error occurred while clearing the term." };
+    }
+}
+
+    

@@ -214,22 +214,24 @@ export default function ElectionResultsPage() {
   if (loading) return <ResultsLoading />;
   if (error) {
     return (
-      <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
-            <AlertTriangle className="h-10 w-10" />
-          </div>
-          <CardTitle className="text-2xl">Error Loading Results</CardTitle>
-          <CardDescription>{error}</CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <Button asChild>
-              <Link href={'/admin/dashboard'}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-              </Link>
-          </Button>
-        </CardContent>
-      </Card>
+     <div className="p-4 md:p-6">
+        <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
+            <CardHeader className="text-center">
+            <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
+                <AlertTriangle className="h-10 w-10" />
+            </div>
+            <CardTitle className="text-2xl">Error Loading Results</CardTitle>
+            <CardDescription>{error}</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+            <Button asChild>
+                <Link href={'/admin/dashboard'}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Link>
+            </Button>
+            </CardContent>
+        </Card>
+      </div>
     );
   }
   if (!room) return notFound();
@@ -270,7 +272,7 @@ export default function ElectionResultsPage() {
 
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 p-4 md:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <Button variant="outline" asChild className="mb-2 sm:mb-0 sm:mr-4">
@@ -364,3 +366,5 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
+
+    

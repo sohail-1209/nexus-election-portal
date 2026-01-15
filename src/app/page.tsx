@@ -56,13 +56,13 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
     const icon = type === 'Authority' ? <Crown className="h-6 w-6 text-amber-500" /> : <Star className="h-6 w-6 text-blue-500" />;
     
     return (
-        <Card className="hover:shadow-lg transition-shadow">
+        <Card className="hover:shadow-lg transition-shadow bg-card/50">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardDescription>{title}</CardDescription>
                     {icon}
                 </div>
-                <CardTitle className="text-2xl">{holder || 'Position Vacant'}</CardTitle>
+                <CardTitle className="text-2xl pt-2">{holder || 'Position Vacant'}</CardTitle>
             </CardHeader>
         </Card>
     )
@@ -147,10 +147,6 @@ export default function HomePage() {
                     <Calendar className="h-4 w-4" />
                     <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>Source Election: {term.sourceRoomTitle}</span>
-                </div>
             </div>
         </header>
 
@@ -178,3 +174,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
