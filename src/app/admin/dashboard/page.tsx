@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -206,29 +205,31 @@ export default function AdminDashboardPage() {
   
   if (error) {
     return (
-      <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
-        <CardHeader className="text-center">
-          <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
-            <AlertTriangle className="h-10 w-10" />
-          </div>
-          <CardTitle className="text-2xl">Error Loading Dashboard</CardTitle>
-          <CardDescription>{error}</CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <Button onClick={() => router.push('/admin/login')}>
-            Go to Login Page
-          </Button>
-        </CardContent>
-      </Card>
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <Card className="w-full max-w-2xl mx-auto mt-10 shadow-xl border-destructive">
+                <CardHeader className="text-center">
+                <div className="mx-auto bg-destructive/10 text-destructive p-3 rounded-full w-fit mb-4">
+                    <AlertTriangle className="h-10 w-10" />
+                </div>
+                <CardTitle className="text-2xl">Error Loading Dashboard</CardTitle>
+                <CardDescription>{error}</CardDescription>
+                </CardHeader>
+                <CardContent className="text-center">
+                <Button onClick={() => router.push('/admin/login')}>
+                    Go to Login Page
+                </Button>
+                </CardContent>
+            </Card>
+        </div>
     )
   }
 
   return (
       <div className="flex h-[calc(100vh-8.7rem)]">
-        <Tabs defaultValue="voting" orientation="vertical" className="flex w-full gap-8">
+        <Tabs defaultValue="voting" orientation="vertical" className="flex w-full">
             <TabsList className={cn(
                 "flex flex-col h-full justify-start items-stretch p-2 w-52",
-                "bg-transparent border-r"
+                "bg-muted/30"
             )}>
                 <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 hover:bg-muted/80 hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none">
                     <Vote /> Voting Rooms
@@ -237,12 +238,14 @@ export default function AdminDashboardPage() {
                     <Star /> Review Rooms
                 </TabsTrigger>
             </TabsList>
-            <TabsContent value="voting" className="flex-1 min-w-0 pr-6">
-                <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
-            </TabsContent>
-            <TabsContent value="review" className="flex-1 min-w-0 pr-6">
-                <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
-            </TabsContent>
+            <div className="flex-1 p-6 min-w-0">
+                <TabsContent value="voting" className="m-0 h-full">
+                    <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
+                </TabsContent>
+                <TabsContent value="review" className="m-0 h-full">
+                    <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
+                </TabsContent>
+            </div>
         </Tabs>
       </div>
   );
