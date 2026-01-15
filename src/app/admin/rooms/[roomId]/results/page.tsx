@@ -286,7 +286,7 @@ export default function ElectionResultsPage() {
             <p className="text-muted-foreground mt-2">{room.description}</p>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-            {room.roomType === 'review' && (
+            {room.finalized && (
               <Dialog>
                 <DialogTrigger asChild>
                   <Button variant="outline">
@@ -297,7 +297,7 @@ export default function ElectionResultsPage() {
                   <DialogHeader>
                     <DialogTitle>Share Read-Only Results</DialogTitle>
                     <DialogDescription>
-                      Anyone with this link can view the results for this review room.
+                      Anyone with this link can view the finalized results for this room.
                       The page is read-only and does not require a login.
                     </DialogDescription>
                   </DialogHeader>
@@ -368,5 +368,3 @@ export default function ElectionResultsPage() {
     </div>
   );
 }
-
-    

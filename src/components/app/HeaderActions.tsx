@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2, PinOff } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2, PinOff, Share2 } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -23,12 +23,23 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import EnableDeletionDialog from "./admin/EnableDeletionDialog";
 import MultiPinDialog from "./admin/MultiPinDialog";
 import ClearTermDialog from "./admin/ClearTermDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import ShareableLinkDisplay from "./admin/ShareableLinkDisplay";
+
 
 export default function HeaderActions() {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [baseUrl, setBaseUrl] = useState('');
   const { hasNotifications, setHasNotifications, triggerNotification } = useNotificationStore();
   const { enableDeletion, multiPin } = useSettingsStore();
 
@@ -36,6 +47,9 @@ export default function HeaderActions() {
 
   useEffect(() => {
     setMounted(true);
+     if (typeof window !== 'undefined') {
+      setBaseUrl(window.location.origin);
+    }
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
@@ -75,6 +89,9 @@ export default function HeaderActions() {
     // This can be used to refresh the dashboard view if needed.
     // For now, a page reload or re-fetch on the dashboard itself handles it.
   }
+  
+  const dashboardLink = `${baseUrl}/`;
+
 
   return (
     <>
@@ -123,6 +140,27 @@ export default function HeaderActions() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuLabel>General Settings</DropdownMenuLabel>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                           <div className="flex w-full items-center justify-between">
+                               <span className="flex items-center gap-2">
+                                 <Share2 className="h-4 w-4" />
+                                 Share Dashboard
+                               </span>
+                           </div>
+                        </DropdownMenuItem>
+                    </DialogTrigger>
+                     <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Share Leadership Dashboard</DialogTitle>
+                            <DialogDescription>
+                            Anyone with this link can view the public leadership dashboard.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <ShareableLinkDisplay voterLink={dashboardLink} />
+                    </DialogContent>
+                </Dialog>
                <MultiPinDialog>
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
                      <div className="flex w-full items-center justify-between">
