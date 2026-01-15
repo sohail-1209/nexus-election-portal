@@ -11,7 +11,7 @@ import type { ElectionRoom } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, CalendarDays } from "lucide-react";
+import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, CalendarDays, Home } from "lucide-react";
 import Link from "next/link";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
@@ -144,7 +144,7 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
             <ScrollArea className="flex-grow pr-4 -mr-4">
               <div className="h-full">
                   {rooms.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-2 gap-6">
                         {rooms.map(room => (
                             <RoomCard key={room.id} room={room} onRoomDeleted={onRoomDeleted} />
                         ))}
@@ -227,14 +227,19 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="h-[calc(100vh-4.1rem)]">
-        <Tabs defaultValue="voting" orientation="vertical" className="flex h-full">
+        <Tabs defaultValue="voting" orientation="vertical" className="flex h-full gap-4">
             <TabsList className={cn(
-                "flex flex-col h-full justify-start items-stretch p-2 w-52 bg-primary/10 rounded-none"
+                "flex flex-col h-full justify-start items-stretch p-2 w-52 bg-muted rounded-none"
             )}>
-                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-primary-foreground/70 hover:bg-primary/80 hover:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+                 <Button variant="ghost" asChild className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-foreground hover:bg-accent hover:text-accent-foreground">
+                    <Link href="/">
+                        <Home /> Home
+                    </Link>
+                </Button>
+                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
                     <Vote /> Voting Rooms
                 </TabsTrigger>
-                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-primary-foreground/70 hover:bg-primary/80 hover:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
+                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-foreground hover:bg-accent hover:text-accent-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
                     <Star /> Review Rooms
                 </TabsTrigger>
             </TabsList>
