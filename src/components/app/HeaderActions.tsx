@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2 } from "lucide-react";
+import { Settings, LogOut, LockKeyhole, Bell, CalendarDays, Trash2, PinOff } from "lucide-react";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { auth } from "@/lib/firebaseClient";
 import { signOut, onAuthStateChanged, User } from "firebase/auth";
@@ -21,6 +21,8 @@ import { useNotificationStore } from "@/stores/notificationStore";
 import { format } from "date-fns";
 import { useSettingsStore } from "@/stores/settingsStore";
 import EnableDeletionDialog from "./admin/EnableDeletionDialog";
+import MultiPinDialog from "./admin/MultiPinDialog";
+import ClearTermDialog from "./admin/ClearTermDialog";
 
 export default function HeaderActions() {
   const router = useRouter();
@@ -28,7 +30,7 @@ export default function HeaderActions() {
   const [user, setUser] = useState<User | null>(null);
   const [mounted, setMounted] = useState(false);
   const { hasNotifications, setHasNotifications, triggerNotification } = useNotificationStore();
-  const { enableDeletion } = useSettingsStore();
+  const { enableDeletion, multiPin } = useSettingsStore();
 
   const isAdminPage = pathname.startsWith('/admin');
 
@@ -68,6 +70,11 @@ export default function HeaderActions() {
     setHasNotifications(false);
     router.push('/admin/calendar');
   };
+  
+  const handleTermCleared = () => {
+    // This can be used to refresh the dashboard view if needed.
+    // For now, a page reload or re-fetch on the dashboard itself handles it.
+  }
 
   return (
     <>
@@ -115,6 +122,22 @@ export default function HeaderActions() {
                   </Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuLabel>General Settings</DropdownMenuLabel>
+               <MultiPinDialog>
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
+                     <div className="flex w-full items-center justify-between">
+                       <span className="flex items-center gap-2">
+                         <PinOff className="h-4 w-4" />
+                         Multi-Pin Rooms
+                       </span>
+                        <div className="flex items-center gap-2">
+                           <span className="text-xs text-muted-foreground">{multiPin ? 'On' : 'Off'}</span>
+                           <div className={`h-2 w-2 rounded-full ${multiPin ? 'bg-green-500' : 'bg-muted'}`} />
+                        </div>
+                     </div>
+                  </DropdownMenuItem>
+              </MultiPinDialog>
+              <DropdownMenuSeparator />
               <DropdownMenuLabel>Destructive Actions</DropdownMenuLabel>
                 <EnableDeletionDialog>
                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer">
@@ -130,6 +153,14 @@ export default function HeaderActions() {
                      </div>
                    </DropdownMenuItem>
                 </EnableDeletionDialog>
+                <ClearTermDialog onTermCleared={handleTermCleared}>
+                     <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="cursor-pointer text-destructive focus:text-destructive">
+                       <span className="flex items-center gap-2">
+                         <Trash2 className="h-4 w-4" />
+                         Clear Current Term
+                       </span>
+                   </DropdownMenuItem>
+                </ClearTermDialog>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleLogout}>
                 <LogOut className="mr-2 h-4 w-4" />

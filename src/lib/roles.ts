@@ -16,8 +16,6 @@ export const clubOperationTeam = [
     "Event Lead", 
     "Workshop Lead", 
     "PR Lead", 
-    "General Lead",
-    "Convo Lead", 
     "Assistant Secretary"
 ];
 

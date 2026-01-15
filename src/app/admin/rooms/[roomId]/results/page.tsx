@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import ShareableLinkDisplay from "@/components/app/admin/ShareableLinkDisplay";
 import FinalizeRoomDialog from "@/components/app/admin/FinalizeRoomDialog";
+import { useSettingsStore } from "@/stores/settingsStore";
 
 
 function ReviewLeaderboard({ positions }: { positions: Position[] }) {
@@ -93,6 +94,7 @@ export default function ElectionResultsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
+  const { multiPin } = useSettingsStore();
   
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -240,7 +242,7 @@ export default function ElectionResultsPage() {
   const participantsCount = room.finalized ? room.finalizedResults!.totalParticipants : totalCompletedVoters;
   
   const canFinalize = room.status === 'closed' && !room.finalized;
-  const canPin = room.finalized && room.roomType === 'voting';
+  const canPin = room.finalized && room.roomType === 'voting' && (multiPin || !room.pinnedToTerm);
 
   
   const renderResults = () => {

@@ -159,9 +159,6 @@ function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
   return (
     <div className="space-y-10 p-6">
         <header className="text-center">
-            <div className="flex justify-center mb-4">
-                 <ClearTermDialog onTermCleared={onTermCleared} />
-            </div>
             <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
             <p className="text-muted-foreground mt-2 text-lg">
                 Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
@@ -381,6 +378,8 @@ export default function AdminDashboardPage() {
 
   const handleTermCleared = () => {
       setTermCleared(c => c + 1); 
+      // Also force-refetch the leadership view
+      setActiveView('home'); 
   };
 
 

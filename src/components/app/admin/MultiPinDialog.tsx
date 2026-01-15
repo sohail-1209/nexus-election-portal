@@ -16,17 +16,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldAlert, Loader2, Eye, EyeOff, Trash2 } from "lucide-react";
+import { ShieldAlert, Loader2, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { clearLatestTerm } from "@/lib/electionRoomService";
+import { useSettingsStore } from "@/stores/settingsStore";
+import { auth } from "@/lib/firebaseClient";
+import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 
 
-interface ClearTermDialogProps {
-    onTermCleared: () => void;
-    children: React.ReactNode;
-}
-
-export default function ClearTermDialog({ onTermCleared, children }: ClearTermDialogProps) {
+export default function MultiPinDialog({ children }: { children: React.ReactNode }) {
+  const { multiPin, toggleMultiPin } = useSettingsStore();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -34,59 +32,67 @@ export default function ClearTermDialog({ onTermCleared, children }: ClearTermDi
   const { toast } = useToast();
 
   const handleConfirm = async () => {
-    setIsLoading(true);
-    const result = await clearLatestTerm(password);
-    setIsLoading(false);
+    const user = auth.currentUser;
+    if (!user || !user.email) {
+      toast({ variant: "destructive", title: "Authentication Error", description: "You are not logged in." });
+      return;
+    }
 
-    if (result.success) {
+    setIsLoading(true);
+    const credential = EmailAuthProvider.credential(user.email, password);
+
+    try {
+      await reauthenticateWithCredential(user, credential);
+      toggleMultiPin();
       toast({
-        title: "Term Cleared",
-        description: "The current leadership term has been cleared from the dashboard.",
+        title: "Setting Updated",
+        description: `Multi-pinning has been ${!multiPin ? "enabled" : "disabled"}.`,
       });
-      onTermCleared();
       setOpen(false);
-    } else {
+    } catch (error) {
+      console.error("Password verification failed", error);
       toast({
         variant: "destructive",
-        title: "Action Failed",
-        description: result.message,
+        title: "Password Incorrect",
+        description: "The password you entered is incorrect. Please try again.",
       });
+    } finally {
+      setIsLoading(false);
+      setPassword("");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => {
-        setOpen(isOpen);
-        if (!isOpen) {
-            setPassword("");
-            setIsLoading(false);
-        }
-    }}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {children}
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Clear Leadership Term</DialogTitle>
+          <DialogTitle>Confirm Your Identity</DialogTitle>
           <DialogDescription>
-            This action will remove the current term and all its roles from the dashboard.
+            To change this sensitive setting, please enter your password.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
-          <Alert variant="destructive">
+          <Alert variant={multiPin ? "default" : "destructive"}>
             <ShieldAlert className="h-4 w-4" />
-            <AlertTitle>Password Confirmation Required</AlertTitle>
+            <AlertTitle>
+              You are about to {multiPin ? "disable" : "enable"} multi-pinning.
+            </AlertTitle>
             <AlertDescription>
-                To clear the current term, please enter your password. This action cannot be undone.
+                {multiPin
+                ? "Disabling this will only allow rooms to be pinned once."
+                : "Enabling this will allow rooms to be pinned multiple times."}
             </AlertDescription>
           </Alert>
           <div className="space-y-2">
-            <Label htmlFor="admin-password-clear-term">
+            <Label htmlFor="admin-password-multipin-toggle">
               Enter your password to confirm
             </Label>
             <div className="relative">
               <Input
-                id="admin-password-clear-term"
+                id="admin-password-multipin-toggle"
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -112,17 +118,16 @@ export default function ClearTermDialog({ onTermCleared, children }: ClearTermDi
             </Button>
           </DialogClose>
           <Button
+            type="button"
             variant="destructive"
             onClick={handleConfirm}
             disabled={isLoading || password.length < 6}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Yes, Clear Term
+            Confirm &amp; Update
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-    
