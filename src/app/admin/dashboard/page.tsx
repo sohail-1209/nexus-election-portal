@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -231,7 +232,7 @@ export default function AdminDashboardPage() {
   return (
     <div className="flex h-screen bg-background">
         <nav className="w-64 flex-shrink-0 bg-muted/40 p-4 flex flex-col gap-2 border-r">
-             <div className="font-bold text-lg p-4 mb-2">N.E.X.U.S Board</div>
+             <div className="font-bold text-lg p-4 mb-2">Admin Panel</div>
             <Link href="/" className={cn(navItemClasses)}>
                 <Home className="h-5 w-5" />
                 <span>Home</span>
