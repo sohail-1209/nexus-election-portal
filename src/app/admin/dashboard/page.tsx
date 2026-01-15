@@ -4,14 +4,15 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebaseClient";
+import { auth, db } from "@/lib/firebaseClient";
 import { getElectionRoomsAndGroups } from "@/lib/electionRoomService";
-import type { ElectionRoom } from "@/lib/types";
+import type { ElectionRoom, Term, LeadershipRole } from "@/lib/types";
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, Home } from "lucide-react";
+import { PlusCircle, AlertTriangle, BarChart3, Users, LockKeyhole, Settings, Vote, Star, Home, Crown, Shield, Calendar, Clock } from "lucide-react";
 import Link from "next/link";
 import { format } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,158 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
+
+
+function LeadershipSkeleton() {
+    return (
+        <div className="space-y-8">
+            <div className="text-center">
+                <Skeleton className="h-10 w-3/4 mx-auto" />
+                <Skeleton className="h-4 w-1/2 mx-auto mt-3" />
+            </div>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/3" />
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {[...Array(6)].map((_, i) => (
+                        <Card key={i}>
+                            <CardHeader>
+                                <Skeleton className="h-5 w-2/3" />
+                                <Skeleton className="h-6 w-1/2" />
+                            </CardHeader>
+                        </Card>
+                    ))}
+                </CardContent>
+            </Card>
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-1/3" />
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                     {[...Array(4)].map((_, i) => (
+                        <Card key={i}>
+                            <CardHeader>
+                                <Skeleton className="h-5 w-2/3" />
+                                <Skeleton className="h-6 w-1/2" />
+                            </CardHeader>
+                        </Card>
+                    ))}
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
+function RoleCard({ role }: { role: LeadershipRole }) {
+    const icon = role.roleType === 'Authority' ? <Crown className="h-6 w-6 text-amber-500" /> : <Star className="h-6 w-6 text-blue-500" />;
+    
+    return (
+        <Card className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <CardDescription>{role.positionTitle}</CardDescription>
+                    {icon}
+                </div>
+                <CardTitle className="text-2xl">{role.holderName || 'Position Vacant'}</CardTitle>
+            </CardHeader>
+        </Card>
+    )
+}
+
+function LeadershipView() {
+  const [term, setTerm] = useState<Term | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLatestTerm = async () => {
+      try {
+        const termsCollection = collection(db, 'terms');
+        const q = query(termsCollection, orderBy('createdAt', 'desc'), limit(1));
+        const termSnapshot = await getDocs(q);
+
+        if (!termSnapshot.empty) {
+          const termDoc = termSnapshot.docs[0];
+          setTerm({ id: termDoc.id, ...termDoc.data() } as Term);
+        }
+      } catch (error) {
+        console.error("Error fetching latest term:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchLatestTerm();
+  }, []);
+
+  if (loading) {
+    return <LeadershipSkeleton />;
+  }
+
+  if (!term) {
+    return (
+      <div className="text-center">
+        <Card className="max-w-2xl mx-auto">
+            <CardHeader>
+                <Users className="h-16 w-16 mx-auto text-muted-foreground" />
+                <CardTitle className="mt-4">No Leadership Term Published</CardTitle>
+                <CardDescription className="mt-2">
+                    There is currently no active leadership term published on the dashboard. Please complete an election and use the "Pin Results to Home" feature to publish the new leadership structure.
+                </CardDescription>
+            </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  const authorities = term.roles.filter(r => r.roleType === 'Authority');
+  const leads = term.roles.filter(r => r.roleType === 'Lead');
+
+  return (
+    <div className="space-y-10">
+        <header className="text-center">
+            <h1 className="text-4xl font-bold font-headline">Current Leadership Structure</h1>
+            <p className="text-muted-foreground mt-2 text-lg">
+                Official leadership for the term starting {format(new Date(term.startDate), 'PPP')}.
+            </p>
+            <div className="flex justify-center items-center gap-6 mt-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>Term: {format(new Date(term.startDate), 'MMM d, yyyy')} - {format(new Date(term.endDate), 'MMM d, yyyy')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span>Source Election: {term.sourceRoomTitle}</span>
+                </div>
+            </div>
+        </header>
+
+        {authorities.length > 0 && (
+            <section>
+                <div className="flex items-center gap-3 mb-4">
+                    <Shield className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Authorities</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {authorities.map(role => <RoleCard key={role.id} role={role} />)}
+                </div>
+            </section>
+        )}
+
+        {leads.length > 0 && (
+            <section>
+                 <div className="flex items-center gap-3 mb-4">
+                    <Star className="h-7 w-7 text-primary" />
+                    <h2 className="text-3xl font-semibold">Leads</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {leads.map(role => <RoleCard key={role.id} role={role} />)}
+                </div>
+            </section>
+        )}
+    </div>
+  );
+}
+
 
 function DashboardSkeleton() {
   return (
@@ -164,7 +317,7 @@ export default function AdminDashboardPage() {
   const [electionRooms, setElectionRooms] = useState<ElectionRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'voting' | 'review'>('voting');
+  const [activeView, setActiveView] = useState<'home' | 'voting' | 'review'>('home');
   const router = useRouter();
 
   const fetchData = useCallback(async () => {
@@ -229,14 +382,30 @@ export default function AdminDashboardPage() {
   const navItemClasses = "flex items-center gap-3 justify-start px-4 py-3 text-muted-foreground font-medium rounded-lg transition-colors hover:bg-accent hover:text-accent-foreground";
   const activeNavItemClasses = "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground";
 
+  const renderActiveView = () => {
+    switch (activeView) {
+        case 'home':
+            return <LeadershipView />;
+        case 'voting':
+            return <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />;
+        case 'review':
+            return <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />;
+        default:
+            return <LeadershipView />;
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background">
         <nav className="w-64 flex-shrink-0 bg-muted/40 p-4 flex flex-col gap-2 border-r">
              <div className="font-bold text-lg p-4 mb-2">Admin Panel</div>
-            <Link href="/" className={cn(navItemClasses)}>
+            <button
+                onClick={() => setActiveView('home')}
+                className={cn(navItemClasses, activeView === 'home' && activeNavItemClasses)}
+            >
                 <Home className="h-5 w-5" />
                 <span>Home</span>
-            </Link>
+            </button>
             <button
                 onClick={() => setActiveView('voting')}
                 className={cn(navItemClasses, activeView === 'voting' && activeNavItemClasses)}
@@ -252,13 +421,9 @@ export default function AdminDashboardPage() {
                 <span>Review Rooms</span>
             </button>
         </nav>
-        <main className="flex-1 p-6 overflow-hidden">
+        <main className="flex-1 p-6 overflow-auto">
             <div className="h-full">
-                {activeView === 'voting' ? (
-                    <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
-                ) : (
-                    <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
-                )}
+                {renderActiveView()}
             </div>
         </main>
     </div>
