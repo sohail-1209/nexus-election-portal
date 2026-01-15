@@ -5,6 +5,7 @@ import Header from '@/components/app/Header';
 import Footer from '@/components/app/Footer';
 import { Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/app/ThemeProvider';
+import { cn } from '@/lib/utils';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -32,7 +33,7 @@ export default function RootLayout({
       <head>
         <meta name="theme-color" content="#00796B" />
       </head>
-      <body className={`${inter.variable} font-body antialiased min-h-screen flex flex-col`} suppressHydrationWarning={true}>
+      <body className={cn(`${inter.variable} font-body antialiased min-h-screen flex flex-col`, "debug-screens")} suppressHydrationWarning={true}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -40,7 +41,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <Header />
-          <main className="flex-grow container mx-auto px-4 py-8">
+          <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>
           <Footer />

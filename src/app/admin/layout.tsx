@@ -1,11 +1,14 @@
-// This layout can be used for admin-specific global elements,
-// like a sub-navigation bar or authentication checks in the future.
-// For now, it will just pass children through.
+// This layout can be used for admin-specific global elements.
+// It creates a full-width container for the admin section.
 
 export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return (
+    <div className="w-full max-w-full">
+      {children}
+    </div>
+  );
 }

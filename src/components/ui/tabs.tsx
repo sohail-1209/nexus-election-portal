@@ -15,6 +15,7 @@ const TabsList = React.forwardRef<
     ref={ref}
     className={cn(
       "inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground",
+      props.orientation === 'vertical' && 'flex-col h-auto items-stretch',
       className
     )}
     {...props}

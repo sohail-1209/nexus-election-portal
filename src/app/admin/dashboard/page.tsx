@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import DeleteRoomDialog from "@/components/app/admin/DeleteRoomDialog";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 function DashboardSkeleton() {
   return (
@@ -128,8 +129,8 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
     const isVoting = roomType === 'voting';
     
     return (
-        <div className="flex flex-col min-h-0 rounded-lg p-4 space-y-4">
-            <div className="flex justify-between items-center">
+        <div className="flex flex-col h-full">
+            <div className="flex-shrink-0 flex justify-between items-center pb-4">
                 <div>
                     <h2 className="text-xl font-bold font-headline">{isVoting ? "Voting Rooms" : "Review & Rating Rooms"}</h2>
                     <p className="text-sm text-muted-foreground">{isVoting ? "Create and manage standard elections." : "Gather feedback and ratings."}</p>
@@ -141,17 +142,19 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
                 </Button>
             </div>
             <ScrollArea className="flex-grow pr-4 -mr-4">
-              {rooms.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {rooms.map(room => (
-                        <RoomCard key={room.id} room={room} onRoomDeleted={onRoomDeleted} />
-                    ))}
-                </div>
-              ) : (
-                 <div className="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg">
-                    No {isVoting ? 'voting' : 'review'} rooms found.
-                </div>
-              )}
+              <div className="h-full">
+                  {rooms.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {rooms.map(room => (
+                            <RoomCard key={room.id} room={room} onRoomDeleted={onRoomDeleted} />
+                        ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground py-20 border-2 border-dashed rounded-lg h-full flex items-center justify-center">
+                        No {isVoting ? 'voting' : 'review'} rooms found.
+                    </div>
+                  )}
+              </div>
             </ScrollArea>
         </div>
     );
@@ -221,21 +224,26 @@ export default function AdminDashboardPage() {
   }
 
   return (
-      <Tabs defaultValue="voting" orientation="vertical" className="flex h-[calc(100vh-140px)] gap-8">
-        <TabsList className="flex flex-col h-full justify-start items-stretch bg-card p-2 w-48">
-            <TabsTrigger value="voting" className="justify-start gap-2">
-                <Vote /> Voting Rooms
-            </TabsTrigger>
-            <TabsTrigger value="review" className="justify-start gap-2">
-                <Star /> Review Rooms
-            </TabsTrigger>
-        </TabsList>
-        <TabsContent value="voting" className="flex-1 min-w-0">
-            <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
-        </TabsContent>
-        <TabsContent value="review" className="flex-1 min-w-0">
-            <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
-        </TabsContent>
-      </Tabs>
+      <div className="flex h-[calc(100vh-8.7rem)]">
+        <Tabs defaultValue="voting" orientation="vertical" className="flex w-full gap-8">
+            <TabsList className={cn(
+                "flex flex-col h-full justify-start items-stretch p-2 w-52",
+                "bg-transparent border-r"
+            )}>
+                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 hover:bg-muted/80 hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none">
+                    <Vote /> Voting Rooms
+                </TabsTrigger>
+                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 hover:bg-muted/80 hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none">
+                    <Star /> Review Rooms
+                </TabsTrigger>
+            </TabsList>
+            <TabsContent value="voting" className="flex-1 min-w-0 pr-6">
+                <RoomList rooms={votingRooms} roomType="voting" onRoomDeleted={fetchData} />
+            </TabsContent>
+            <TabsContent value="review" className="flex-1 min-w-0 pr-6">
+                <RoomList rooms={reviewRooms} roomType="review" onRoomDeleted={fetchData} />
+            </TabsContent>
+        </Tabs>
+      </div>
   );
 }
