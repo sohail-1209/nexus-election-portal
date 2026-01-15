@@ -622,17 +622,42 @@ export async function updateTermRoles(updatedRoles: LeadershipRole[]): Promise<{
 
 const rolesCollectionRef = collection(db, 'clubRoles');
 
+const defaultClubAuthorities = [
+    "President", 
+    "Vice President", 
+    "Technical Manager", 
+    "Event Manager", 
+    "Workshop Manager", 
+    "PR Manager", 
+    "General Secretary"
+];
+
+const defaultClubLeads = [
+    "Technical Lead", 
+    "Event Lead", 
+    "Workshop Lead", 
+    "PR Lead", 
+    "Assistant Secretary"
+];
+
+const defaultRoles = [
+    ...defaultClubAuthorities.map(title => ({ title, type: 'Authority' as const })),
+    ...defaultClubLeads.map(title => ({ title, type: 'Lead' as const })),
+];
+
+
 export async function getClubRoles(): Promise<{ id: string; title: string; type: 'Authority' | 'Lead' }[]> {
   try {
     const snapshot = await getDocs(query(rolesCollectionRef, orderBy('title')));
     if (snapshot.empty) {
-        // Here you could seed initial roles if you wanted
-        return [];
+        // If the collection is empty, return the hardcoded default roles.
+        return defaultRoles.map(role => ({ id: role.title.toLowerCase().replace(/\s+/g, '-'), ...role }));
     }
     return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
   } catch (error) {
     console.error("Error fetching club roles:", error);
-    return [];
+    // Return default roles as a fallback in case of error
+    return defaultRoles.map(role => ({ id: role.title.toLowerCase().replace(/\s+/g, '-'), ...role }));
   }
 }
 
@@ -681,5 +706,3 @@ export async function updateClubRoles(roles: { title: string; type: 'Authority' 
         return { success: false, message: 'Failed to update club roles.' };
     }
 }
-
-    
