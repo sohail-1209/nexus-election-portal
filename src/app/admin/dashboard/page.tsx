@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
@@ -143,7 +144,7 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
             <ScrollArea className="flex-grow pr-4 -mr-4">
               <div className="h-full">
                   {rooms.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                         {rooms.map(room => (
                             <RoomCard key={room.id} room={room} onRoomDeleted={onRoomDeleted} />
                         ))}
@@ -225,16 +226,15 @@ export default function AdminDashboardPage() {
   }
 
   return (
-      <div className="flex h-[calc(100vh-8.7rem)]">
-        <Tabs defaultValue="voting" orientation="vertical" className="flex w-full">
+    <div className="h-[calc(100vh-4.1rem)]">
+        <Tabs defaultValue="voting" orientation="vertical" className="flex h-full">
             <TabsList className={cn(
-                "flex flex-col h-full justify-start items-stretch p-2 w-52",
-                "bg-muted/30"
+                "flex flex-col h-full justify-start items-stretch p-2 w-52 bg-primary/10 rounded-none"
             )}>
-                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 hover:bg-muted/80 hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none">
+                <TabsTrigger value="voting" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-primary-foreground/70 hover:bg-primary/80 hover:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
                     <Vote /> Voting Rooms
                 </TabsTrigger>
-                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 hover:bg-muted/80 hover:text-foreground data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none">
+                <TabsTrigger value="review" className="justify-start gap-2 text-base py-3 px-4 transition-colors duration-200 text-primary-foreground/70 hover:bg-primary/80 hover:text-primary-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-lg">
                     <Star /> Review Rooms
                 </TabsTrigger>
             </TabsList>
