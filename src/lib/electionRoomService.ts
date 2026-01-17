@@ -626,7 +626,7 @@ const defaultRoles: { title: string, type: ClubRole['type'] }[] = [
     { title: "Faculty Coordinator", type: 'Faculty' },
     
     { title: "President", type: 'Authority' },
-    { title: "Vice president", type: 'Authority' },
+    { title: "Vice President", type: 'Authority' },
     { title: "Technical Manager", type: 'Authority' },
     { title: "Event Manager", type: 'Authority' },
     { title: "PR Manager", type: 'Authority' },
@@ -639,7 +639,7 @@ const defaultRoles: { title: string, type: ClubRole['type'] }[] = [
     { title: "Workshop Lead", type: 'Lead' },
     { title: "Assistant Secretary", type: 'Lead' },
 
-    { title: "Design & Content creation Team", type: 'Team' },
+    { title: "Design & Content Creation Team", type: 'Team' },
     { title: "Logistics Team", type: 'Team' },
     { title: "Technical Team", type: 'Team' },
     { title: "Documentation & Archive Team", type: 'Team' },
@@ -652,16 +652,29 @@ const defaultRoles: { title: string, type: ClubRole['type'] }[] = [
 
 export async function getClubRoles(): Promise<ClubRole[]> {
   try {
-    const snapshot = await getDocs(query(rolesCollectionRef, orderBy('title')));
+    const snapshot = await getDocs(query(rolesCollectionRef));
     if (snapshot.empty) {
         // If the collection is empty, return the hardcoded default roles.
-        return defaultRoles.map(role => ({ id: role.title.toLowerCase().replace(/\s+/g, '-'), ...role }));
+        return defaultRoles.map(role => ({ id: role.title.toLowerCase().replace(/[\s&]+/g, '-'), ...role }));
     }
-    return snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    const rolesFromDb = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+    
+    // Sort roles based on the order of defaultRoles categories
+    const categoryOrder: ClubRole['type'][] = ['Faculty', 'Authority', 'Lead', 'Team', 'Other'];
+    rolesFromDb.sort((a, b) => {
+        const aIndex = categoryOrder.indexOf(a.type);
+        const bIndex = categoryOrder.indexOf(b.type);
+        if (aIndex !== bIndex) {
+            return aIndex - bIndex;
+        }
+        return a.title.localeCompare(b.title);
+    });
+
+    return rolesFromDb;
   } catch (error) {
     console.error("Error fetching club roles:", error);
     // Return default roles as a fallback in case of error
-    return defaultRoles.map(role => ({ id: role.title.toLowerCase().replace(/\s+/g, '-'), ...role }));
+    return defaultRoles.map(role => ({ id: role.title.toLowerCase().replace(/[\s&]+/g, '-'), ...role }));
   }
 }
 
@@ -671,10 +684,10 @@ export async function updateClubRoles(roles: { title: string; type: ClubRole['ty
         
         // Get current roles to find out which to delete
         const currentRolesSnap = await getDocs(rolesCollectionRef);
-        const currentRoles = currentRolesSnap.docs.map(d => d.data().title);
-        const newRoles = roles.map(r => r.title);
+        const currentRolesInDb = currentRolesSnap.docs.map(d => d.data().title);
+        const newRoleTitles = roles.map(r => r.title);
 
-        const rolesToDelete = currentRoles.filter(r => !newRoles.includes(r));
+        const rolesToDelete = currentRolesInDb.filter(title => !newRoleTitles.includes(title));
         
         currentRolesSnap.docs.forEach(doc => {
             if (rolesToDelete.includes(doc.data().title)) {
@@ -685,7 +698,8 @@ export async function updateClubRoles(roles: { title: string; type: ClubRole['ty
         // Add or update roles
         for (const role of roles) {
             // Use role title as the document ID for simplicity and uniqueness
-            const roleRef = doc(db, 'clubRoles', role.title.toLowerCase().replace(/\s+/g, '-'));
+            const roleId = role.title.toLowerCase().replace(/[\s&]+/g, '-');
+            const roleRef = doc(db, 'clubRoles', roleId);
             batch.set(roleRef, role, { merge: true });
         }
 
@@ -696,7 +710,7 @@ export async function updateClubRoles(roles: { title: string; type: ClubRole['ty
         if(latestTerm) {
             const termHolderMap = new Map(latestTerm.roles.map(r => [r.positionTitle, r.holderName]));
             const newTermRoles: LeadershipRole[] = roles.map(role => ({
-                id: role.title.replace(/\s+/g, '-'),
+                id: role.title.toLowerCase().replace(/[\s&]+/g, '-'),
                 positionTitle: role.title,
                 holderName: termHolderMap.get(role.title) || '',
                 roleType: role.type,

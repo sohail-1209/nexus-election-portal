@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,7 +25,7 @@ import { getLatestTerm, updateTermRoles, getClubRoles, updateClubRoles } from "@
 import { auth } from "@/lib/firebaseClient";
 import { EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import type { LeadershipRole } from "@/lib/types";
+import type { LeadershipRole, ClubRole } from "@/lib/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -84,6 +84,33 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
       name: "roles"
   });
 
+  const groupedAndSortedRoles = useMemo(() => {
+    const allRoles = form.watch('roles');
+
+    const grouped: Record<string, { role: any, originalIndex: number }[]> = {
+        'Faculty': [], 'Authorities': [], 'Leads': [], 'Teams': [], 'Others': []
+    };
+
+    allRoles.forEach((role, index) => {
+        const categoryMap = {
+            'Faculty': 'Faculty',
+            'Authority': 'Authorities',
+            'Lead': 'Leads',
+            'Team': 'Teams',
+            'Other': 'Others'
+        };
+        const category = categoryMap[role.type] || 'Others';
+        grouped[category].push({ role, originalIndex: index });
+    });
+
+     for (const category in grouped) {
+        grouped[category].sort((a, b) => a.role.title.localeCompare(b.role.title));
+    }
+
+    return Object.entries(grouped).filter(([, roles]) => roles.length > 0);
+
+  }, [form, fields]);
+
   const loadRoleData = async () => {
     setIsFormLoading(true);
     const clubRoles = await getClubRoles();
@@ -126,7 +153,7 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
             toast({ variant: "destructive", title: "Duplicate Role", description: "This role title already exists."});
             return;
         }
-        append({ id: newTitle, title: newTitle, type: newType });
+        append({ id: newTitle.toLowerCase().replace(/[\s&]+/g, '-'), title: newTitle, type: newType });
         form.setValue("newRoleTitle", "");
         form.setValue("newRoleType", "Lead");
     }
@@ -214,17 +241,22 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
                     <ScrollArea className="h-96 pr-4 -mr-4">
                         {isFormLoading ? <EditTermFormSkeleton /> : (
                             <div className="space-y-4">
-                                <div>
+                                <div className="space-y-4">
                                     <h4 className="font-medium mb-2">Existing Roles</h4>
-                                    {fields.map((field, index) => (
-                                        <div key={field.id} className="flex items-center gap-2 p-2 border rounded-md mb-2">
-                                            <div className="flex-grow">
-                                                <p className="font-semibold">{field.title}</p>
-                                                <p className="text-xs text-muted-foreground">{field.type}</p>
-                                            </div>
-                                            <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(index)}>
-                                                <Trash2 className="h-4 w-4"/>
-                                            </Button>
+                                     {groupedAndSortedRoles.map(([category, roles]) => (
+                                        <div key={category} className="mb-4">
+                                            <h5 className="text-sm font-semibold text-muted-foreground mb-2">{category}</h5>
+                                            {roles.map(({ role, originalIndex }) => (
+                                                <div key={originalIndex} className="flex items-center gap-2 p-2 border rounded-md mb-2">
+                                                    <div className="flex-grow">
+                                                        <p className="font-semibold">{role.title}</p>
+                                                        <p className="text-xs text-muted-foreground">{role.type}</p>
+                                                    </div>
+                                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => remove(originalIndex)}>
+                                                        <Trash2 className="h-4 w-4"/>
+                                                    </Button>
+                                                </div>
+                                            ))}
                                         </div>
                                     ))}
                                 </div>
