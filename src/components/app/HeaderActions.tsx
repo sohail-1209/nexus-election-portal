@@ -48,9 +48,9 @@ export default function HeaderActions() {
 
   useEffect(() => {
     setMounted(true);
-     if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin);
-    }
+    const url = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+    setBaseUrl(url);
+
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
     });
@@ -156,7 +156,7 @@ export default function HeaderActions() {
                         <DialogHeader>
                             <DialogTitle>Share Leadership Dashboard</DialogTitle>
                             <DialogDescription>
-                            This special link will show the public leadership view, even if you are logged in as an admin. Share it with anyone to let them see the current structure.
+                            This special link will show the public leadership view. For the link to be accessible by others, ensure the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">NEXT_PUBLIC_BASE_URL</code> in your <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">.env</code> file is set to your app's public URL.
                             </DialogDescription>
                         </DialogHeader>
                         <ShareableLinkDisplay voterLink={dashboardLink} />

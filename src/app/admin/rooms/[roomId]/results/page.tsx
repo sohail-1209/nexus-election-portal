@@ -97,9 +97,8 @@ export default function ElectionResultsPage() {
   const { multiPin } = useSettingsStore();
   
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin);
-    }
+    const url = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+    setBaseUrl(url);
   }, []);
 
   const fetchRoomData = useCallback(async () => {
@@ -297,8 +296,7 @@ export default function ElectionResultsPage() {
                   <DialogHeader>
                     <DialogTitle>Share Read-Only Results</DialogTitle>
                     <DialogDescription>
-                      Anyone with this link can view the finalized results for this room.
-                      The page is read-only and does not require a login.
+                      For the shareable link to be accessible by others, ensure the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">NEXT_PUBLIC_BASE_URL</code> variable in your <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">.env</code> file is set to your app's public URL. Anyone with this link can view the finalized results.
                     </DialogDescription>
                   </DialogHeader>
                   <ShareableLinkDisplay voterLink={shareableResultsLink} />

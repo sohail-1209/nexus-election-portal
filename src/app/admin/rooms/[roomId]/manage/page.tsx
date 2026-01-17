@@ -165,9 +165,8 @@ export default function ManageElectionRoomPage() {
   const [baseUrl, setBaseUrl] = useState('');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setBaseUrl(window.location.origin);
-    }
+    const url = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+    setBaseUrl(url);
 
     if (!roomId) {
         setError("Room ID is missing from the URL.");
@@ -290,8 +289,7 @@ export default function ManageElectionRoomPage() {
               <DialogHeader>
                 <DialogTitle>Access & Sharing</DialogTitle>
                 <DialogDescription>
-                  Share this room with participants. For the link to work correctly when your app is deployed,
-                  ensure your environment variable is set to your app's public URL.
+                  For the shareable link to be accessible by others, ensure the <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">NEXT_PUBLIC_BASE_URL</code> variable in your <code className="font-mono text-xs bg-muted px-1 py-0.5 rounded">.env</code> file is set to your app's public URL.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 pt-2">
