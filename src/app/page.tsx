@@ -72,7 +72,7 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
 export default function HomePage() {
   const router = useRouter();
   const [term, setTerm] = useState<Term | null>(null);
-  const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead'}[]>([]);
+  const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead' | 'Other'}[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchLeadershipData = useCallback(async () => {
@@ -91,10 +91,8 @@ export default function HomePage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
         if (user) {
-            // If user is logged in, redirect to the main admin dashboard.
             router.replace('/admin/dashboard');
         } else {
-            // If no user, this is a public visitor, so load the leadership data.
             fetchLeadershipData();
         }
     });
@@ -117,13 +115,21 @@ export default function HomePage() {
           roleType: 'Lead' as const
       }));
 
-      // Define canonical order
       const authorityOrder = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
       const leadOrder = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "Assistant Secretary"];
 
-      // Sort the filtered lists
-      authorities.sort((a, b) => authorityOrder.indexOf(a.title) - authorityOrder.indexOf(b.title));
-      leads.sort((a, b) => leadOrder.indexOf(a.title) - leadOrder.indexOf(b.title));
+      const customSort = (order: string[]) => (a: {title: string}, b: {title:string}) => {
+          const aIndex = order.indexOf(a.title);
+          const bIndex = order.indexOf(b.title);
+
+          if (aIndex === -1 && bIndex === -1) return a.title.localeCompare(b.title);
+          if (aIndex === -1) return 1;
+          if (bIndex === -1) return -1;
+          return aIndex - bIndex;
+      };
+
+      authorities.sort(customSort(authorityOrder));
+      leads.sort(customSort(leadOrder));
 
       return { authorities, leads };
   }, [term, clubRoles]);
@@ -136,8 +142,6 @@ export default function HomePage() {
     );
   }
 
-  // This content will only be visible to non-authenticated users.
-  // Logged-in users will be redirected away before this renders.
   if (!term && clubRoles.length === 0) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">

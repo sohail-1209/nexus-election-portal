@@ -19,13 +19,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import type { ElectionRoom } from "@/lib/types"; 
+import type { ElectionRoom, ClubRole } from "@/lib/types"; 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PlusCircle, Trash2, Loader2, GripVertical } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { db } from "@/lib/firebaseClient"; 
 import { doc, setDoc, addDoc, collection, serverTimestamp, Timestamp } from "firebase/firestore";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from "@/components/ui/select";
 import { getClubRoles } from "@/lib/electionRoomService";
 
 const candidateSchema = z.object({
@@ -79,7 +79,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [isFormMounted, setIsFormMounted] = useState(false);
-  const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+  const [availableRoles, setAvailableRoles] = useState<ClubRole[]>([]);
   
   const form = useForm<ReviewRoomFormValues>({
     resolver: zodResolver(reviewRoomFormSchema),
@@ -108,10 +108,10 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
   useEffect(() => {
     async function fetchRoles() {
         const roles = await getClubRoles();
-        const roleTitles = roles.map(r => r.title);
-        setAvailableRoles(roleTitles);
+        setAvailableRoles(roles);
 
         if (initialData) {
+            const roleTitles = roles.map(r => r.title);
             const adjustedPositions = (initialData.positions || []).map(p => {
                 const isCustom = !roleTitles.includes(p.title);
                 return {
@@ -125,7 +125,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
         }
     }
     fetchRoles();
-  }, [initialData]);
+  }, [initialData, form]);
 
   const { fields: positionFields, append: appendPosition, remove: removePosition } = useFieldArray({
     control: form.control,
@@ -337,12 +337,21 @@ interface PositionCardProps {
   removePosition: (index: number) => void;
   form: any; 
   isOnlyPosition: boolean;
-  availableRoles: string[];
+  availableRoles: ClubRole[];
 }
 
 function PositionCard({ positionIndex, removePosition, form, isOnlyPosition, availableRoles }: PositionCardProps) {
   const { control, watch } = form;
   const positionTitleValue = watch(`positions.${positionIndex}.title`);
+
+  const groupedRoles = useMemo(() => {
+    return {
+        authorities: availableRoles.filter(r => r.type === 'Authority'),
+        leads: availableRoles.filter(r => r.type === 'Lead'),
+        other: availableRoles.filter(r => r.type === 'Other'),
+    }
+  }, [availableRoles]);
+
 
   return (
     <Card className="relative group/position">
@@ -381,10 +390,20 @@ function PositionCard({ positionIndex, removePosition, form, isOnlyPosition, ava
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {availableRoles.map(role => (
-                          <SelectItem key={role} value={role}>{role}</SelectItem>
-                        ))}
-                        <SelectItem value="Other">Other</SelectItem>
+                        {groupedRoles.authorities.length > 0 && <SelectGroup>
+                            <SelectLabel>Authorities</SelectLabel>
+                            {groupedRoles.authorities.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                        </SelectGroup>}
+                        {groupedRoles.leads.length > 0 && <SelectGroup>
+                            <SelectLabel>Leads</SelectLabel>
+                            {groupedRoles.leads.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                        </SelectGroup>}
+                        {groupedRoles.other.length > 0 && <SelectGroup>
+                            <SelectLabel>General Roles</SelectLabel>
+                            {groupedRoles.other.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                        </SelectGroup>}
+                        <SelectSeparator />
+                        <SelectItem value="Other">Other (Custom)</SelectItem>
                       </SelectContent>
                     </Select>
                   <FormMessage />
@@ -460,5 +479,3 @@ function SimpleCandidateFields({ positionIndex, control, form }: SimpleCandidate
     </div>
   );
 }
-
-    

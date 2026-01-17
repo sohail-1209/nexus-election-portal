@@ -1,10 +1,10 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, notFound, useRouter } from "next/navigation";
-import { getElectionRoomById, submitBallot, submitReview, recordParticipantEntry } from "@/lib/electionRoomService";
-import type { ElectionRoom, Position } from "@/lib/types";
+import { getElectionRoomById, submitBallot, submitReview, recordParticipantEntry, getClubRoles } from "@/lib/electionRoomService";
+import type { ElectionRoom, Position, ClubRole } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator, SelectLabel, SelectGroup } from "@/components/ui/select";
-import { facultyRoles, clubAuthorities, clubOperationTeam, generalClubRoles } from "@/lib/roles";
 
 
 function VotingSkeleton() {
@@ -220,6 +219,29 @@ const GuidelinesScreen = ({
     const [isEmailValid, setIsEmailValid] = useState(false);
     const [rulesAcknowledged, setRulesAcknowledged] = useState(false);
     
+    const [rolesLoading, setRolesLoading] = useState(true);
+    const [groupedRoles, setGroupedRoles] = useState<{
+        faculty: ClubRole[],
+        authorities: ClubRole[],
+        leads: ClubRole[],
+        general: ClubRole[],
+    }>({ faculty: [], authorities: [], leads: [], general: [] });
+
+    useEffect(() => {
+        const fetchAndGroupRoles = async () => {
+            setRolesLoading(true);
+            const roles = await getClubRoles();
+            setGroupedRoles({
+                faculty: roles.filter(r => r.title === 'Coordinator'),
+                authorities: roles.filter(r => r.type === 'Authority' && r.title !== 'Coordinator'),
+                leads: roles.filter(r => r.type === 'Lead'),
+                general: roles.filter(r => r.type === 'Other'),
+            });
+            setRolesLoading(false);
+        };
+        fetchAndGroupRoles();
+    }, []);
+
     const ownPositionTitle = positionRole === 'Other' ? customPositionRole : positionRole;
     const canProceed = isEmailValid && rulesAcknowledged && ownPositionTitle;
 
@@ -309,29 +331,36 @@ const GuidelinesScreen = ({
                             <SelectValue placeholder="Select your current position or role..." />
                         </SelectTrigger>
                         <SelectContent>
-                           <SelectGroup>
-                              <SelectLabel>Faculty</SelectLabel>
-                              {facultyRoles
-                                .map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                           </SelectGroup>
-                           <SelectSeparator />
-                           <SelectGroup>
-                               <SelectLabel>Club Authorities</SelectLabel>
-                               {clubAuthorities
-                                .map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                           </SelectGroup>
-                           <SelectSeparator />
-                           <SelectGroup>
-                               <SelectLabel>Club Operation Team</SelectLabel>
-                               {clubOperationTeam
-                                .map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                           </SelectGroup>
-                           <SelectSeparator />
-                           <SelectGroup>
-                              <SelectLabel>General Club Roles</SelectLabel>
-                              {generalClubRoles
-                                .map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}
-                           </SelectGroup>
+                           {rolesLoading ? <SelectItem value="loading" disabled>Loading roles...</SelectItem> : (
+                               <>
+                                   {groupedRoles.faculty.length > 0 && (
+                                       <SelectGroup>
+                                           <SelectLabel>Faculty</SelectLabel>
+                                           {groupedRoles.faculty.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                                       </SelectGroup>
+                                   )}
+                                   {groupedRoles.authorities.length > 0 && (
+                                       <SelectGroup>
+                                           <SelectLabel>Club Authorities</SelectLabel>
+                                           {groupedRoles.authorities.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                                       </SelectGroup>
+                                   )}
+                                   {groupedRoles.leads.length > 0 && (
+                                       <SelectGroup>
+                                           <SelectLabel>Club Operation Team</SelectLabel>
+                                           {groupedRoles.leads.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                                       </SelectGroup>
+                                   )}
+                                   {groupedRoles.general.length > 0 && (
+                                       <SelectGroup>
+                                           <SelectLabel>General Club Roles</SelectLabel>
+                                           {groupedRoles.general.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                                       </SelectGroup>
+                                   )}
+                                   <SelectSeparator />
+                                   <SelectItem value="Other">Other (Specify)</SelectItem>
+                               </>
+                           )}
                         </SelectContent>
                     </Select>
                     {positionRole === 'Other' && (
@@ -414,12 +443,12 @@ export default function VotingPage() {
     const result = await recordParticipantEntry(roomId, email, ownPositionTitle);
 
     if (result.success) {
-      const skippableRoles = [...facultyRoles, ...generalClubRoles];
-      const normalizedOwnPosition = ownPositionTitle.toLowerCase().replace(/-/g, ' ');
-      const canSkip = skippableRoles.some(role => role.toLowerCase().replace(/-/g, ' ') === normalizedOwnPosition);
+      const skippableRoles = ["Coordinator", "Member", "Public Relation Team", "Design and Content Creation Team", "Documentation and Archive Team", "Logistics Team", "Technical Team", "Networking and Collaboration Team"];
+      const normalizedOwnPosition = ownPositionTitle.toLowerCase().replace(/[-_\s]/g, '');
+      const canSkip = skippableRoles.some(role => role.toLowerCase().replace(/[-_\s]/g, '') === normalizedOwnPosition);
       
       const positionsToShow = room.positions.filter(p => {
-        const normalizedPositionTitle = p.title.toLowerCase().replace(/-/g, ' ');
+        const normalizedPositionTitle = p.title.toLowerCase().replace(/[-_\s]/g, '');
         return normalizedPositionTitle !== normalizedOwnPosition;
       });
 

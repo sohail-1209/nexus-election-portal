@@ -80,7 +80,7 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
 
 function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
   const [term, setTerm] = useState<Term | null>(null);
-  const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead'}[]>([]);
+  const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead' | 'Other'}[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchLeadershipData = useCallback(async () => {
@@ -115,16 +115,23 @@ function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
           roleType: 'Lead' as const
       }));
 
-      // Define canonical order
       const authorityOrder = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
       const leadOrder = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "Assistant Secretary"];
 
-      // Sort the filtered lists
-      authorities.sort((a, b) => authorityOrder.indexOf(a.title) - authorityOrder.indexOf(b.title));
-      leads.sort((a, b) => leadOrder.indexOf(a.title) - leadOrder.indexOf(b.title));
+      const customSort = (order: string[]) => (a: {title: string}, b: {title:string}) => {
+          const aIndex = order.indexOf(a.title);
+          const bIndex = order.indexOf(b.title);
+
+          if (aIndex === -1 && bIndex === -1) return a.title.localeCompare(b.title);
+          if (aIndex === -1) return 1;
+          if (bIndex === -1) return -1;
+          return aIndex - bIndex;
+      };
+
+      authorities.sort(customSort(authorityOrder));
+      leads.sort(customSort(leadOrder));
 
       return { authorities, leads };
-
   }, [term, clubRoles]);
 
 
@@ -349,11 +356,11 @@ export default function AdminDashboardPage() {
       const { rooms } = await getElectionRoomsAndGroups();
       setElectionRooms(rooms);
     } catch (err: any) {
-      if (err.code === 'permission-denied') {
-        setError("You do not have permission to view the dashboard. Please contact support.");
-      } else {
-        setError("An unexpected error occurred while loading the dashboard. Please try again later.");
-      }
+        if (err.code === 'permission-denied') {
+            setError("You do not have permission to view the dashboard. Please contact support.");
+        } else {
+            setError("An unexpected error occurred while loading the dashboard. Please try again later.");
+        }
     } finally {
       setLoading(false);
     }
@@ -456,5 +463,3 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
-
-    
