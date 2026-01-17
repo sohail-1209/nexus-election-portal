@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebaseClient';
 import type { Term } from '@/lib/types';
@@ -71,6 +71,7 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
 
 export default function HomePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [term, setTerm] = useState<Term | null>(null);
   const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead' | 'Other'}[]>([]);
   const [loading, setLoading] = useState(true);
@@ -90,7 +91,8 @@ export default function HomePage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (user) {
+        const isPublicView = searchParams.get('view') === 'public';
+        if (user && !isPublicView) {
             router.replace('/admin/dashboard');
         } else {
             fetchLeadershipData();
@@ -98,7 +100,7 @@ export default function HomePage() {
     });
 
     return () => unsubscribe();
-  }, [router, fetchLeadershipData]);
+  }, [router, fetchLeadershipData, searchParams]);
 
   const leadershipRoles = useMemo(() => {
       const pinnedRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));

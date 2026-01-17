@@ -91,7 +91,7 @@ export default function HeaderActions() {
     // For now, a page reload or re-fetch on the dashboard itself handles it.
   }
   
-  const dashboardLink = `${baseUrl}/`;
+  const dashboardLink = `${baseUrl}/?view=public`;
 
 
   return (
@@ -156,7 +156,7 @@ export default function HeaderActions() {
                         <DialogHeader>
                             <DialogTitle>Share Leadership Dashboard</DialogTitle>
                             <DialogDescription>
-                            Anyone with this link can view the public leadership dashboard.
+                            This special link will show the public leadership view, even if you are logged in as an admin. Share it with anyone to let them see the current structure.
                             </DialogDescription>
                         </DialogHeader>
                         <ShareableLinkDisplay voterLink={dashboardLink} />
