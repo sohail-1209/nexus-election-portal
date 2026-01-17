@@ -8,9 +8,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { onAuthStateChanged, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebaseClient";
-import { getElectionRoomById, pinResultsToHome, getLatestTerm } from "@/lib/electionRoomService";
+import { getElectionRoomById, pinResultsToHome, getLatestTerm, getClubRoles } from "@/lib/electionRoomService";
 import type { ElectionRoom, LeadershipRole, Term } from "@/lib/types";
-import { clubAuthorities } from "@/lib/roles";
 
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -34,7 +33,7 @@ const leadershipRoleSchema = z.object({
     id: z.string(),
     positionTitle: z.string(),
     holderName: z.string().min(1, "Winner's name is required."),
-    roleType: z.enum(['Authority', 'Lead']),
+    roleType: z.enum(['Authority', 'Lead', 'Other']),
 });
 
 const pinFormSchema = z.object({
@@ -118,6 +117,9 @@ export default function PinToHomePage() {
              return;
           }
           setRoom(roomData);
+          
+          const allClubRoles = await getClubRoles();
+          const roleTypeMap = new Map(allClubRoles.map(r => [r.title, r.type]));
 
           const roles: LeadershipRole[] = (roomData.finalizedResults?.positions || []).map(p => {
              const maxVotes = Math.max(...(p.candidates.map(c => c.voteCount || 0)));
@@ -126,7 +128,7 @@ export default function PinToHomePage() {
                  id: p.id,
                  positionTitle: p.title,
                  holderName: winner?.name || '',
-                 roleType: clubAuthorities.includes(p.title) ? 'Authority' : 'Lead',
+                 roleType: roleTypeMap.get(p.title) || 'Other',
              };
           });
 

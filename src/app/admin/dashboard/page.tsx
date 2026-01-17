@@ -115,6 +115,14 @@ function LeadershipView({onTermCleared}: {onTermCleared: () => void}) {
           roleType: 'Lead' as const
       }));
 
+      // Define canonical order
+      const authorityOrder = ["President", "Vice President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
+      const leadOrder = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "Assistant Secretary"];
+
+      // Sort the filtered lists
+      authorities.sort((a, b) => authorityOrder.indexOf(a.title) - authorityOrder.indexOf(b.title));
+      leads.sort((a, b) => leadOrder.indexOf(a.title) - leadOrder.indexOf(b.title));
+
       return { authorities, leads };
 
   }, [term, clubRoles]);
