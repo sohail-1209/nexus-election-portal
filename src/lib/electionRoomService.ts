@@ -201,12 +201,16 @@ export async function recordParticipantEntry(
     voterEmail: string,
     ownPositionTitle: string
 ): Promise<{ success: boolean; message: string }> {
-    const clubAuthorities = ["President", "Vice President", "Vice-President", "Technical Manager", "Event Manager", "Workshop Manager", "PR Manager", "General Secretary"];
-    const clubOperationTeam = ["Technical Lead", "Event Lead", "Workshop Lead", "PR Lead", "Assistant Secretary"];
-    
-    const isRestrictedRole = clubAuthorities.includes(ownPositionTitle) || clubOperationTeam.includes(ownPositionTitle);
 
-    if (isRestrictedRole) {
+    const allRoles = await getClubRoles();
+    const roleInfo = allRoles.find(r => r.title === ownPositionTitle);
+
+    // If the role isn't found in the official list, it must be a custom "Other" role.
+    // Roles with type 'Other' are also unrestricted.
+    const isUnrestrictedRole = !roleInfo || roleInfo.type === 'Other';
+
+    // If the role is restricted, check if someone from this specific position has already completed their submission.
+    if (!isUnrestrictedRole) {
         const votersColRef = collection(db, "electionRooms", roomId, "voters");
         const q = query(votersColRef, where("ownPositionTitle", "==", ownPositionTitle), where("status", "==", "completed"));
         const snapshot = await getDocs(q);
@@ -214,11 +218,13 @@ export async function recordParticipantEntry(
             return { success: false, message: `A submission for the role "${ownPositionTitle}" has already been completed.` };
         }
     }
-    
+
     const voterRef = doc(db, "electionRooms", roomId, "voters", voterEmail);
     try {
         await runTransaction(db, async (transaction) => {
             const voterDoc = await transaction.get(voterRef);
+
+            // Regardless of role, a specific person (by email) cannot submit more than once.
             if (voterDoc.exists()) {
                 if (voterDoc.data().status === 'completed') {
                     throw new Error("You have already completed your submission for this room.");
@@ -238,7 +244,7 @@ export async function recordParticipantEntry(
         return { success: true, message: "Entry recorded." };
     } catch (error: any) {
         console.error("Error recording participant entry:", error);
-        return { success: false, message: error.message || "Could not record your entry. Please try again." };
+        return { success: false, message: error.message || "An unexpected error occurred while recording your entry." };
     }
 }
 
