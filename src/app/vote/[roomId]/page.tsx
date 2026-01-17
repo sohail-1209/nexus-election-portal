@@ -452,11 +452,11 @@ export default function VotingPage() {
 
     if (result.success) {
       const skippableRoles = ["Coordinator", "Member", "Public Relation Team", "Design and Content Creation Team", "Documentation and Archive Team", "Logistics Team", "Technical Team", "Networking and Collaboration Team"];
-      const normalizedOwnPosition = ownPositionTitle.toLowerCase().replace(/[-_\s]/g, '');
-      const canSkip = skippableRoles.some(role => role.toLowerCase().replace(/[-_\s]/g, '') === normalizedOwnPosition);
+      const normalizedOwnPosition = ownPositionTitle.toLowerCase().replace(/[-_\\s]/g, '');
+      const canSkip = skippableRoles.some(role => role.toLowerCase().replace(/[-_\\s]/g, '') === normalizedOwnPosition);
       
       const positionsToShow = room.positions.filter(p => {
-        const normalizedPositionTitle = p.title.toLowerCase().replace(/[-_\s]/g, '');
+        const normalizedPositionTitle = p.title.toLowerCase().replace(/[-_\\s]/g, '');
         return normalizedPositionTitle !== normalizedOwnPosition;
       });
 
