@@ -181,6 +181,7 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
           title: "Review Room Updated",
           description: `"${values.title}" has been successfully updated.`,
         });
+        router.refresh();
       } else {
         dataToSave.status = dataToSave.status || 'pending';
         await addDoc(collection(db, "electionRooms"), {
@@ -191,9 +192,9 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
           title: "Review Room Created",
           description: `"${values.title}" has been successfully created.`,
         });
+        router.push(`/admin/dashboard`);
+        router.refresh(); 
       }
-      router.push(`/admin/dashboard`);
-      router.refresh(); 
     } catch (error) {
       console.error("Error saving review room: ", error);
       toast({
@@ -246,38 +247,47 @@ export default function ReviewRoomForm({ initialData }: ReviewRoomFormProps) {
         />
 
         {initialData && ( 
-          <FormField
-            control={form.control}
-            name="status"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                <div className="space-y-0.5">
-                  <FormLabel className="text-base">
-                    {field.value === 'active' ? 'Room is Active' : 'Room is Inactive'}
-                  </FormLabel>
-                  <FormDescription>
-                    Turn this on to allow reviews. Turning it off will close the room.
-                  </FormDescription>
-                </div>
-                <FormControl>
-                  <Switch
-                    checked={field.value === 'active'}
-                    onCheckedChange={(checked) => {
-                      const currentStatus = form.getValues('status');
-                       let newStatus: 'pending' | 'active' | 'closed';
-                      if(currentStatus === 'pending' && !checked) {
-                        newStatus = 'pending';
-                      } else {
-                        newStatus = checked ? 'active' : 'closed';
-                      }
-                      field.onChange(newStatus);
-                    }}
-                    aria-label="Room Status Toggle"
-                  />
-                </FormControl>
-              </FormItem>
-            )}
-          />
+          <>
+            <FormField
+              control={form.control}
+              name="status"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">
+                      {field.value === 'active' ? 'Room is Active' : 'Room is Inactive'}
+                    </FormLabel>
+                    <FormDescription>
+                      Turn this on to allow reviews. Turning it off will close the room.
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value === 'active'}
+                      onCheckedChange={(checked) => {
+                        const currentStatus = form.getValues('status');
+                        let newStatus: 'pending' | 'active' | 'closed';
+                        if(currentStatus === 'pending' && !checked) {
+                          newStatus = 'pending';
+                        } else {
+                          newStatus = checked ? 'active' : 'closed';
+                        }
+                        field.onChange(newStatus);
+                      }}
+                      aria-label="Room Status Toggle"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+            <Button type="submit" className="w-full" disabled={isLoading} suppressHydrationWarning={true}>
+              {isLoading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating Room...</>
+              ) : (
+                  'Update Review Room'
+              )}
+            </Button>
+          </>
         )}
         
         <div className="space-y-4">

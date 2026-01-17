@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebaseClient";
 import { getElectionRoomsAndGroups, getLatestTerm, getClubRoles } from "@/lib/electionRoomService";
@@ -343,12 +343,19 @@ function RoomList({ rooms, roomType, onRoomDeleted }: { rooms: ElectionRoom[], r
 
 
 export default function AdminDashboardPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [electionRooms, setElectionRooms] = useState<ElectionRoom[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeView, setActiveView] = useState<'home' | 'voting' | 'review'>('home');
+
+  const initialView = searchParams.get('view');
+  const [activeView, setActiveView] = useState<'home' | 'voting' | 'review'>(
+    initialView === 'voting' || initialView === 'review' ? initialView : 'home'
+  );
+
   const [termCleared, setTermCleared] = useState(0);
-  const router = useRouter();
 
   const fetchData = useCallback(async () => {
     try {

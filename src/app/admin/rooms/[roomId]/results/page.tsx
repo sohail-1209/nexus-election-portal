@@ -242,6 +242,7 @@ export default function ElectionResultsPage() {
   
   const canFinalize = room.status === 'closed' && !room.finalized;
   const canPin = room.finalized && room.roomType === 'voting' && (multiPin || !room.pinnedToTerm);
+  const backLinkHref = room.roomType === 'review' ? '/admin/dashboard?view=review' : '/admin/dashboard?view=voting';
 
   
   const renderResults = () => {
@@ -277,9 +278,9 @@ export default function ElectionResultsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
             <Button variant="outline" asChild className="mb-2 sm:mb-0 sm:mr-4">
-            <Link href={'/admin/dashboard'}>
+              <Link href={backLinkHref}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
-            </Link>
+              </Link>
             </Button>
             <h1 className="text-3xl font-bold font-headline mt-2">Results: {room.title}</h1>
             <p className="text-muted-foreground mt-2">{room.description}</p>
