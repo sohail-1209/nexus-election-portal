@@ -33,7 +33,7 @@ const leadershipRoleSchema = z.object({
     id: z.string(),
     positionTitle: z.string(),
     holderName: z.string().min(1, "Winner's name is required."),
-    roleType: z.enum(['Authority', 'Lead', 'Other']),
+    roleType: z.enum(['Faculty', 'Authority', 'Lead', 'Team', 'Other']),
 });
 
 const pinFormSchema = z.object({

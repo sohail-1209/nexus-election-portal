@@ -59,7 +59,7 @@ export interface LeadershipRole {
     id: string;
     positionTitle: string;
     holderName: string;
-    roleType: 'Authority' | 'Lead' | 'Other';
+    roleType: 'Faculty' | 'Authority' | 'Lead' | 'Team' | 'Other';
 }
 
 export interface Term {
@@ -76,7 +76,7 @@ export interface Term {
 export interface ClubRole {
     id: string;
     title: string;
-    type: 'Authority' | 'Lead' | 'Other';
+    type: 'Faculty' | 'Authority' | 'Lead' | 'Team' | 'Other';
 }
 
     

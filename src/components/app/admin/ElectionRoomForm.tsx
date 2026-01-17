@@ -358,8 +358,10 @@ function PositionCard({ positionIndex, removePosition, form, initialData, isOnly
 
   const groupedRoles = useMemo(() => {
     return {
+        faculty: availableRoles.filter(r => r.type === 'Faculty'),
         authorities: availableRoles.filter(r => r.type === 'Authority'),
         leads: availableRoles.filter(r => r.type === 'Lead'),
+        teams: availableRoles.filter(r => r.type === 'Team'),
         other: availableRoles.filter(r => r.type === 'Other'),
     }
   }, [availableRoles]);
@@ -401,6 +403,10 @@ function PositionCard({ positionIndex, removePosition, form, initialData, isOnly
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
+                        {groupedRoles.faculty.length > 0 && <SelectGroup>
+                            <SelectLabel>Faculty</SelectLabel>
+                            {groupedRoles.faculty.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                        </SelectGroup>}
                         {groupedRoles.authorities.length > 0 && <SelectGroup>
                             <SelectLabel>Authorities</SelectLabel>
                             {groupedRoles.authorities.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
@@ -409,8 +415,12 @@ function PositionCard({ positionIndex, removePosition, form, initialData, isOnly
                             <SelectLabel>Leads</SelectLabel>
                             {groupedRoles.leads.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
                         </SelectGroup>}
+                        {groupedRoles.teams.length > 0 && <SelectGroup>
+                            <SelectLabel>Teams</SelectLabel>
+                            {groupedRoles.teams.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                        </SelectGroup>}
                         {groupedRoles.other.length > 0 && <SelectGroup>
-                            <SelectLabel>General Roles</SelectLabel>
+                            <SelectLabel>Others</SelectLabel>
                             {groupedRoles.other.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
                         </SelectGroup>}
                         <SelectSeparator />

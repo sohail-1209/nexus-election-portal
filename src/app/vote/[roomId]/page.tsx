@@ -224,18 +224,20 @@ const GuidelinesScreen = ({
         faculty: ClubRole[],
         authorities: ClubRole[],
         leads: ClubRole[],
-        general: ClubRole[],
-    }>({ faculty: [], authorities: [], leads: [], general: [] });
+        teams: ClubRole[],
+        other: ClubRole[],
+    }>({ faculty: [], authorities: [], leads: [], teams: [], other: [] });
 
     useEffect(() => {
         const fetchAndGroupRoles = async () => {
             setRolesLoading(true);
             const roles = await getClubRoles();
             setGroupedRoles({
-                faculty: roles.filter(r => r.title === 'Coordinator'),
-                authorities: roles.filter(r => r.type === 'Authority' && r.title !== 'Coordinator'),
+                faculty: roles.filter(r => r.type === 'Faculty'),
+                authorities: roles.filter(r => r.type === 'Authority'),
                 leads: roles.filter(r => r.type === 'Lead'),
-                general: roles.filter(r => r.type === 'Other'),
+                teams: roles.filter(r => r.type === 'Team'),
+                other: roles.filter(r => r.type === 'Other'),
             });
             setRolesLoading(false);
         };
@@ -341,20 +343,26 @@ const GuidelinesScreen = ({
                                    )}
                                    {groupedRoles.authorities.length > 0 && (
                                        <SelectGroup>
-                                           <SelectLabel>Club Authorities</SelectLabel>
+                                           <SelectLabel>Authorities</SelectLabel>
                                            {groupedRoles.authorities.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
                                        </SelectGroup>
                                    )}
                                    {groupedRoles.leads.length > 0 && (
                                        <SelectGroup>
-                                           <SelectLabel>Club Operation Team</SelectLabel>
+                                           <SelectLabel>Leads</SelectLabel>
                                            {groupedRoles.leads.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
                                        </SelectGroup>
                                    )}
-                                   {groupedRoles.general.length > 0 && (
+                                   {groupedRoles.teams.length > 0 && (
                                        <SelectGroup>
-                                           <SelectLabel>General Club Roles</SelectLabel>
-                                           {groupedRoles.general.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                                           <SelectLabel>Teams</SelectLabel>
+                                           {groupedRoles.teams.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
+                                       </SelectGroup>
+                                   )}
+                                    {groupedRoles.other.length > 0 && (
+                                       <SelectGroup>
+                                           <SelectLabel>Others</SelectLabel>
+                                           {groupedRoles.other.map(role => <SelectItem key={role.id} value={role.title}>{role.title}</SelectItem>)}
                                        </SelectGroup>
                                    )}
                                    <SelectSeparator />

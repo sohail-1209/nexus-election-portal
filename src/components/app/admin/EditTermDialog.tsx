@@ -35,10 +35,10 @@ const roleManagementSchema = z.object({
   roles: z.array(z.object({
     id: z.string(),
     title: z.string().min(1, "Title is required."),
-    type: z.enum(['Authority', 'Lead', 'Other']),
+    type: z.enum(['Faculty', 'Authority', 'Lead', 'Team', 'Other']),
   })),
   newRoleTitle: z.string().optional(),
-  newRoleType: z.enum(['Authority', 'Lead', 'Other']).optional(),
+  newRoleType: z.enum(['Faculty', 'Authority', 'Lead', 'Team', 'Other']).optional(),
 });
 
 type RoleManagementFormValues = z.infer<typeof roleManagementSchema>;
@@ -254,8 +254,10 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
                                                             </SelectTrigger>
                                                         </FormControl>
                                                         <SelectContent>
+                                                            <SelectItem value="Faculty">Faculty</SelectItem>
                                                             <SelectItem value="Authority">Authority</SelectItem>
                                                             <SelectItem value="Lead">Lead</SelectItem>
+                                                            <SelectItem value="Team">Team</SelectItem>
                                                             <SelectItem value="Other">Other</SelectItem>
                                                         </SelectContent>
                                                     </Select>
@@ -284,5 +286,4 @@ export default function EditTermDialog({ onTermUpdated, children }: EditTermDial
     </Dialog>
   );
 }
-
     

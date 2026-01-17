@@ -2,7 +2,7 @@
 import { db, auth } from "@/lib/firebaseClient";
 import { doc, getDoc, collection, query, where, getDocs, runTransaction, Timestamp, DocumentData, orderBy, writeBatch, addDoc, deleteDoc, updateDoc, setDoc, serverTimestamp, limit } from "firebase/firestore";
 import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
-import type { ElectionRoom, Voter, Review, Position, FinalizedResults, Term, LeadershipRole } from '@/lib/types';
+import type { ElectionRoom, Voter, Review, Position, FinalizedResults, Term, LeadershipRole, ClubRole } from '@/lib/types';
 
 
 export async function getElectionRoomsAndGroups(): Promise<{ rooms: ElectionRoom[] }> {
@@ -622,31 +622,35 @@ export async function updateTermRoles(updatedRoles: LeadershipRole[]): Promise<{
 
 const rolesCollectionRef = collection(db, 'clubRoles');
 
-const defaultClubAuthorities = [
-    "President", 
-    "Vice President", 
-    "Technical Manager", 
-    "Event Manager", 
-    "Workshop Manager", 
-    "PR Manager", 
-    "General Secretary"
+const defaultRoles: { title: string, type: ClubRole['type'] }[] = [
+    { title: "Faculty Coordinator", type: 'Faculty' },
+    
+    { title: "President", type: 'Authority' },
+    { title: "Vice president", type: 'Authority' },
+    { title: "Technical Manager", type: 'Authority' },
+    { title: "Event Manager", type: 'Authority' },
+    { title: "PR Manager", type: 'Authority' },
+    { title: "Workshop Manager", type: 'Authority' },
+    { title: "General Secretary", type: 'Authority' },
+
+    { title: "Technical Lead", type: 'Lead' },
+    { title: "Event Lead", type: 'Lead' },
+    { title: "PR Lead", type: 'Lead' },
+    { title: "Workshop Lead", type: 'Lead' },
+    { title: "Assistant Secretary", type: 'Lead' },
+
+    { title: "Design & Content creation Team", type: 'Team' },
+    { title: "Logistics Team", type: 'Team' },
+    { title: "Technical Team", type: 'Team' },
+    { title: "Documentation & Archive Team", type: 'Team' },
+    { title: "Public Relation Team", type: 'Team' },
+    { title: "Networking & Collaboration Team", type: 'Team' },
+
+    { title: "Club board member", type: 'Other' },
 ];
 
-const defaultClubLeads = [
-    "Technical Lead", 
-    "Event Lead", 
-    "Workshop Lead", 
-    "PR Lead", 
-    "Assistant Secretary"
-];
 
-const defaultRoles = [
-    ...defaultClubAuthorities.map(title => ({ title, type: 'Authority' as const })),
-    ...defaultClubLeads.map(title => ({ title, type: 'Lead' as const })),
-];
-
-
-export async function getClubRoles(): Promise<{ id: string; title: string; type: 'Authority' | 'Lead' }[]> {
+export async function getClubRoles(): Promise<ClubRole[]> {
   try {
     const snapshot = await getDocs(query(rolesCollectionRef, orderBy('title')));
     if (snapshot.empty) {
@@ -661,7 +665,7 @@ export async function getClubRoles(): Promise<{ id: string; title: string; type:
   }
 }
 
-export async function updateClubRoles(roles: { title: string; type: 'Authority' | 'Lead' }[]): Promise<{ success: boolean; message: string }> {
+export async function updateClubRoles(roles: { title: string; type: ClubRole['type'] }[]): Promise<{ success: boolean; message: string }> {
     try {
         const batch = writeBatch(db);
         
