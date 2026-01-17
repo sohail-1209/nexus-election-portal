@@ -455,10 +455,14 @@ export default function VotingPage() {
       const normalizedOwnPosition = ownPositionTitle.toLowerCase().replace(/[-_\\s]/g, '');
       const canSkip = skippableRoles.some(role => role.toLowerCase().replace(/[-_\\s]/g, '') === normalizedOwnPosition);
       
-      const positionsToShow = room.positions.filter(p => {
-        const normalizedPositionTitle = p.title.toLowerCase().replace(/[-_\\s]/g, '');
-        return normalizedPositionTitle !== normalizedOwnPosition;
-      });
+      let positionsToShow = room.positions;
+      // Only filter out the user's own position if it's a REVIEW room.
+      if (room.roomType === 'review') {
+        positionsToShow = room.positions.filter(p => {
+            const normalizedPositionTitle = p.title.toLowerCase().replace(/[-_\\s]/g, '');
+            return normalizedPositionTitle !== normalizedOwnPosition;
+        });
+      }
 
       const initialSelections: Record<string, any> = {};
       positionsToShow.forEach(p => {
