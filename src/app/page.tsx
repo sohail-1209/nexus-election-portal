@@ -2,9 +2,10 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore';
-import { db } from '@/lib/firebaseClient';
-import type { Term, LeadershipRole } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebaseClient';
+import type { Term } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Users, Crown, Shield, Star, Calendar } from 'lucide-react';
@@ -69,6 +70,7 @@ function RoleCard({ title, holder, type }: { title: string, holder?: string, typ
 }
 
 export default function HomePage() {
+  const router = useRouter();
   const [term, setTerm] = useState<Term | null>(null);
   const [clubRoles, setClubRoles] = useState<{title: string, type: 'Authority' | 'Lead'}[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +89,18 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    fetchLeadershipData();
-  }, [fetchLeadershipData]);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+            // If user is logged in, redirect to the main admin dashboard.
+            router.replace('/admin/dashboard');
+        } else {
+            // If no user, this is a public visitor, so load the leadership data.
+            fetchLeadershipData();
+        }
+    });
+
+    return () => unsubscribe();
+  }, [router, fetchLeadershipData]);
 
   const leadershipRoles = useMemo(() => {
       const pinnedRoles = new Map(term?.roles.map(r => [r.positionTitle, r.holderName]));
@@ -116,6 +128,8 @@ export default function HomePage() {
     );
   }
 
+  // This content will only be visible to non-authenticated users.
+  // Logged-in users will be redirected away before this renders.
   if (!term && clubRoles.length === 0) {
     return (
       <div className="container mx-auto py-8 px-4 text-center">
@@ -179,5 +193,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    
